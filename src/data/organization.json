@@ -1,0 +1,22 @@
+{
+ "@type": "Organization",
+ "@id": "https://www.spanfloors.com/#organization",
+ "name": "Span Floors",
+ "description": "Designer Wooden Floorings",
+ "url": "https://www.spanfloors.com/",
+ "telephone": "+919212096387",
+ "logo": {
+  "@type": "ImageObject",
+  "url": "https://www.spanfloors.com/wp-content/uploads/2022/02/Span-Floors-Logo.jpg",
+  "@id": "https://www.spanfloors.com/#organizationLogo"
+ },
+ "image": {
+  "@id": "https://www.spanfloors.com/#organizationLogo"
+ },
+ "sameAs": [
+  "https://www.facebook.com/spanfloors/",
+  "https://twitter.com/spanfloors",
+  "https://www.instagram.com/spanfloors/",
+  "https://www.linkedin.com/company/span-floors-llp"
+ ]
+}

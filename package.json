@@ -1,0 +1,48 @@
+{
+  "name": "spanfloors-web",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "db:up": "docker compose --env-file docker.env up -d db",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "admin:create": "tsx --conditions=react-server --env-file=.env.local scripts/create-admin.ts",
+    "import:wp": "tsx --conditions=react-server --env-file=.env.local scripts/import-wordpress.ts",
+    "content:tidy": "tsx --conditions=react-server --env-file=.env.local scripts/tidy-content.ts",
+    "import:blog": "tsx --conditions=react-server --env-file=.env.local scripts/import-blog.ts"
+  },
+  "dependencies": {
+    "@tiptap/extension-image": "^3.32.0",
+    "@tiptap/extension-placeholder": "^3.32.0",
+    "@tiptap/pm": "^3.32.0",
+    "@tiptap/react": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
+    "drizzle-orm": "^0.45.4",
+    "file-type": "^22.2.0",
+    "image-size": "^2.0.4",
+    "next": "^16.4.0",
+    "nodemailer": "^10.1.1",
+    "pg": "^8.23.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sanitize-html": "^2.18.0",
+    "server-only": "^0.0.1",
+    "swiper": "^14.3.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.6.5",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/sanitize-html": "^2.16.2",
+    "drizzle-kit": "^0.31.11",
+    "postcss": "^8.5.30",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

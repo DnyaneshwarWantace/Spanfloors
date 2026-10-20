@@ -1,0 +1,15 @@
+# Local/VPS database. Start with: docker compose --env-file docker.env up -d db
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: spanfloors
+      POSTGRES_USER: spanfloors
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spanfloors_dev}
+    ports:
+      - "5544:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

@@ -1,0 +1,23 @@
+[    6917ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3100/media/wp/2026/07/crest.png:0
+[    6918ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3100/media/wp/2026/07/%E6%98%9F%E6%98%9F-1-Stars-1-scaled.jpg:0
+[    7218ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3100/media/wp/2026/07/grok-image-db06b445-d416-4471-831f-ec6ad51e6db0.jpg:0
+[    7272ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3100/media/wp/2026/07/14_pattern_square_tiles.png:0
+[   13673ms] [VERBOSE] [DOM] Multiple forms should be contained in their own form elements; break up complex forms into ones that represent a single action: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:3100/admin/settings/integrations/:0
+[   21986ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:3100/admin/account/:0
+[ 1396882ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2024/02/Group-517.png:0
+[ 1396882ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/ic3.png:0
+[ 1396882ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/ic1.png:0
+[ 1396882ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/ic2.png:0
+[ 1396882ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/end-user-banner-12.jpg:0
+[ 1396882ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/team.jpg:0
+[ 1400623ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3100/wooden-flooring-101-guide/:0
+[ 1400648ms] Minified React error #441; visit https://react.dev/errors/441 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+[ 1400679ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3100/favicon.ico:0
+[ 1420859ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2024/02/Group-517.png:0
+[ 1420870ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/ic3.png:0
+[ 1420872ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/ic1.png:0
+[ 1420872ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/ic2.png:0
+[ 1420874ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/end-user-banner-12.jpg:0
+[ 1420874ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.spanfloors.com/wp-content/uploads/2023/02/team.jpg:0
+[ 1423717ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3100/wooden-flooring-101-guide/:0
+[ 1423744ms] Minified React error #441; visit https://react.dev/errors/441 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
