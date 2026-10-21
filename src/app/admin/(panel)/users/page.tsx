@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
+import Dropdown from "@/components/ui/Dropdown";
 import { cookies } from "next/headers";
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { logActivity, requireUser } from "@/server/auth";
+import { isHttps, logActivity, requireUser } from "@/server/auth";
 import { hashPassword, randomToken } from "@/server/crypto";
 import { Badge, btn, formatDate, inputCls, Notice, PageHeader } from "@/components/admin/ui";
 
@@ -13,7 +14,7 @@ async function flashPassword(email: string, temp: string, reset: boolean) {
   (await cookies()).set("sf_flash", JSON.stringify({ email, temp, reset }), {
     httpOnly: true,
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: await isHttps(),
     path: "/admin/users/",
     maxAge: 60,
   });
@@ -102,10 +103,15 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         </label>
         <label className="grid gap-1.5 text-2xs font-medium">
           Role
-          <select name="role" className={inputCls}>
-            <option value="editor">Editor</option>
-            <option value="admin">Admin</option>
-          </select>
+          <Dropdown
+            name="role"
+            defaultValue="editor"
+            aria-label="Role"
+            options={[
+              { value: "editor", label: "Editor", hint: "Blog, pages, media, settings" },
+              { value: "admin", label: "Admin", hint: "Everything, incl. API keys & users" },
+            ]}
+          />
         </label>
         <button className={btn.primary}>Add user</button>
       </form>

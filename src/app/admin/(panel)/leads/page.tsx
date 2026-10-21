@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Dropdown from "@/components/ui/Dropdown";
 import { count, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/server/auth";
@@ -81,24 +82,24 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       <form className="mb-4 flex flex-wrap items-end gap-2 text-2xs">
         {sp.type && <input type="hidden" name="type" value={sp.type} />}
         <input name="q" defaultValue={sp.q} placeholder="Search name, email, phone, city…" className={`${inputCls} h-9 w-64 text-2xs`} aria-label="Search" />
-        <select name="status" defaultValue={sp.status ?? ""} className={`${inputCls} h-9 w-auto text-2xs`} aria-label="Status">
-          <option value="">All statuses (except spam)</option>
-          {["new", "contacted", "converted", "closed", "cancelled", "spam"].map((s) => (
-            <option key={s} value={s} className="capitalize">
-              {s}
-            </option>
-          ))}
-        </select>
-        <select name="assigned" defaultValue={sp.assigned ?? ""} className={`${inputCls} h-9 w-auto text-2xs`} aria-label="Assigned to">
-          <option value="">Anyone</option>
-          <option value="me">Assigned to me</option>
-          <option value="none">Unassigned</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
+        <Dropdown
+          name="status"
+          defaultValue={sp.status ?? ""}
+          submitOnChange
+          size="sm"
+          className="w-52"
+          aria-label="Status"
+          options={[{ value: "", label: "All statuses (except spam)" }, ...["new", "contacted", "converted", "closed", "cancelled", "spam"].map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }))]}
+        />
+        <Dropdown
+          name="assigned"
+          defaultValue={sp.assigned ?? ""}
+          submitOnChange
+          size="sm"
+          className="w-44"
+          aria-label="Assigned to"
+          options={[{ value: "", label: "Anyone" }, { value: "me", label: "Assigned to me" }, { value: "none", label: "Unassigned" }, ...users.map((u) => ({ value: u.id, label: u.name }))]}
+        />
         <label className="grid gap-1">
           From
           <input type="date" name="from" defaultValue={sp.from} className={`${inputCls} h-9 w-auto text-2xs`} />

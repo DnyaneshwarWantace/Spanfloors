@@ -125,7 +125,7 @@ export default function RichEditor({ name, initialHtml, placeholder = "Start wri
     editorProps: {
       attributes: {
         class:
-          "prose-cms min-h-[28rem] px-6 py-5 text-body leading-relaxed outline-none [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-ink [&_blockquote]:pl-4 [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lead [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:text-title [&_img]:my-4 [&_img]:max-h-96 [&_iframe]:my-4 [&_iframe]:aspect-video [&_iframe]:w-full [&_iframe]:max-w-2xl [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_.is-editor-empty:first-child::before]:pointer-events-none [&_.is-editor-empty:first-child::before]:float-left [&_.is-editor-empty:first-child::before]:h-0 [&_.is-editor-empty:first-child::before]:text-muted [&_.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
+          "prose-cms min-h-[28rem] max-w-full px-6 py-5 text-body leading-relaxed break-words outline-none [&_img]:h-auto [&_img]:max-w-full [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_iframe]:max-w-full [&_pre]:overflow-x-auto [&_a]:break-all [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-ink [&_blockquote]:pl-4 [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lead [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:text-title [&_img]:my-4 [&_img]:max-h-96 [&_iframe]:my-4 [&_iframe]:aspect-video [&_iframe]:w-full [&_iframe]:max-w-2xl [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_.is-editor-empty:first-child::before]:pointer-events-none [&_.is-editor-empty:first-child::before]:float-left [&_.is-editor-empty:first-child::before]:h-0 [&_.is-editor-empty:first-child::before]:text-muted [&_.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
       },
     },
     onUpdate: ({ editor: e }) => setValue(e.getHTML()),
@@ -137,7 +137,7 @@ export default function RichEditor({ name, initialHtml, placeholder = "Start wri
   }, [htmlMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="border border-line bg-white/60">
+    <div className="min-w-0 max-w-full border border-line bg-white/60">
       <input type="hidden" name={name} value={value} />
       {editor && <Toolbar editor={editor} onImage={() => setPicking(true)} html={htmlMode} onToggleHtml={() => setHtmlMode((h) => !h)} />}
       {htmlMode ? (

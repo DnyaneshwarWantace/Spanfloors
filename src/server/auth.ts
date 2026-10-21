@@ -43,6 +43,14 @@ async function recordFailure(key: string, limit: number) {
     });
 }
 
+/** True when the request reached us over HTTPS (directly or via a proxy such as Cloudflare/nginx). */
+export async function isHttps() {
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  if (proto) return proto === "https";
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "").startsWith("https://") && !(h.get("host") ?? "").startsWith("localhost");
+}
+
 export type LoginResult = { user: SessionUser } | { error: "invalid" | "locked" };
 
 /** Checks email + password (with lockout); on success creates a session and sets the cookie. */
@@ -77,7 +85,9 @@ export async function login(email: string, password: string): Promise<LoginResul
 
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // HTTPS-only when actually served over HTTPS (live site). On http://localhost a secure cookie
+    // is dropped by some browsers (Safari), which logged people out on every click.
+    secure: await isHttps(),
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_DAYS * 86400,

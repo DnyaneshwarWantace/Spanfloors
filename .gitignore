@@ -1,5 +1,21 @@
 node_modules
 .next
+*.tsbuildinfo
+next-env.d.ts
+
+# secrets & local config
 .env
-.env.local
+.env.*
+docker.env
+
+# media & data — files live in storage (and later S3/R2), never in git
+storage/
+wordpress/
 twenty-data-format.json
+
+# client documents (confidential)
+*.pdf
+
+# tooling output
+.playwright-cli/
+.DS_Store

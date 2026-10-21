@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Dropdown from "@/components/ui/Dropdown";
 import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -150,24 +151,21 @@ export default async function LeadDetail({ params }: { params: Promise<{ id: str
             <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Manage</h2>
             <label className="grid gap-1.5 text-2xs font-medium">
               Status
-              <select name="status" defaultValue={lead.status} className={inputCls}>
-                {["new", "contacted", "converted", "closed", "cancelled", "spam"].map((s) => (
-                  <option key={s} value={s} className="capitalize">
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </option>
-                ))}
-              </select>
+              <Dropdown
+                name="status"
+                defaultValue={lead.status}
+                aria-label="Status"
+                options={["new", "contacted", "converted", "closed", "cancelled", "spam"].map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }))}
+              />
             </label>
             <label className="grid gap-1.5 text-2xs font-medium">
               Assigned to
-              <select name="assignedTo" defaultValue={lead.assignedTo ?? ""} className={inputCls}>
-                <option value="">Unassigned</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+              <Dropdown
+                name="assignedTo"
+                defaultValue={lead.assignedTo ?? ""}
+                aria-label="Assigned to"
+                options={[{ value: "", label: "Unassigned" }, ...users.map((u) => ({ value: u.id, label: u.name }))]}
+              />
             </label>
             <button className={btn.primary}>Save</button>
             {lead.slotStart && <p className="text-2xs text-muted">Setting a booking to Cancelled or Closed frees its time slot.</p>}

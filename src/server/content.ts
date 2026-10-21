@@ -26,6 +26,7 @@ const fields = {
   featuredPath: schema.media.path,
   featuredAlt: schema.media.alt,
   author: schema.users.name,
+  authorName: schema.content.authorName,
 };
 
 const haveFile = (rel: string) => {
@@ -59,8 +60,12 @@ function queryByPath(path: string) {
     .limit(1);
 }
 
-/** A live page or post at this exact path (with trailing slash). */
-export const getContentByPath = unstable_cache(
+/** The data cache stores JSON, so dates come back as strings: turn them back into Date objects. */
+function reviveDates<T extends { publishedAt: Date | string | null; updatedAt: Date | string }>(r: T) {
+  return { ...r, publishedAt: r.publishedAt ? new Date(r.publishedAt) : null, updatedAt: new Date(r.updatedAt) };
+}
+
+const cachedByPath = unstable_cache(
   async (path: string) => {
     const [row] = await queryByPath(path);
     return row ? shape(row) : null;
@@ -69,8 +74,13 @@ export const getContentByPath = unstable_cache(
   { tags: ["content"], revalidate: 60 },
 );
 
-/** Live blog posts, newest first. */
-export const listPosts = unstable_cache(
+/** A live page or post at this exact path (with trailing slash). */
+export async function getContentByPath(path: string) {
+  const row = await cachedByPath(path);
+  return row ? reviveDates(row) : null;
+}
+
+const cachedPosts = unstable_cache(
   async (opts: { limit?: number; offset?: number; tag?: string } = {}) => {
     const where = and(eq(schema.content.type, "post"), isLive(), opts.tag ? sql`${opts.tag} = any(${schema.content.tags})` : undefined);
     const [rows, [{ n }]] = await Promise.all([
@@ -91,8 +101,14 @@ export const listPosts = unstable_cache(
   { tags: ["content"], revalidate: 60 },
 );
 
+/** Live blog posts, newest first. */
+export async function listPosts(opts: { limit?: number; offset?: number; tag?: string } = {}) {
+  const r = await cachedPosts(opts);
+  return { posts: r.posts.map(reviveDates), total: r.total };
+}
+
 /** Every live page/post path (for the sitemap). */
-export const listLivePaths = unstable_cache(
+const cachedLivePaths = unstable_cache(
   async () =>
     db
       .select({ path: schema.content.path, updatedAt: schema.content.updatedAt, type: schema.content.type, robots: schema.content.robots })
@@ -101,6 +117,10 @@ export const listLivePaths = unstable_cache(
   ["live-paths"],
   { tags: ["content"], revalidate: 300 },
 );
+
+export async function listLivePaths() {
+  return (await cachedLivePaths()).map((r) => ({ ...r, updatedAt: new Date(r.updatedAt) }));
+}
 
 /** Redirect configured in the admin for this path, if any (also counts the hit). */
 export async function findRedirect(path: string) {

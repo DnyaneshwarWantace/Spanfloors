@@ -87,6 +87,8 @@ export const content = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    /** Byline shown on the post (imported posts keep their original WordPress author). */
+    authorName: text("author_name"),
     legacyWpId: integer("legacy_wp_id"),
     legacyWpType: text("legacy_wp_type"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

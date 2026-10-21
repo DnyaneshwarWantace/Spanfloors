@@ -35,16 +35,34 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           <Link href="/" target="_blank" className="px-2 text-paper/70 hover:text-paper">
             View website ↗
           </Link>
-          <div className="flex items-center justify-between gap-2 px-2">
-            <Link href="/admin/account/" className="min-w-0">
-              <div className="truncate text-paper">{user.name}</div>
-              <div className="truncate text-paper/50">
-                {user.email} · <span className="capitalize">{user.role}</span>
+          <div className="grid min-w-0 gap-3 rounded-sm bg-white/5 p-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-paper/15 text-body text-paper">
+                {user.name.trim().charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-body text-paper">{user.name}</span>
+                  <span className="shrink-0 rounded-sm bg-paper/15 px-1.5 py-px text-2xs capitalize text-paper/80">{user.role}</span>
+                </div>
+                <div className="truncate text-paper/50" title={user.email}>
+                  {user.email}
+                </div>
               </div>
-            </Link>
-            <form action={signOut}>
-              <button className="shrink-0 rounded-sm border border-line-light px-2 py-1 text-paper/70 hover:text-paper">Sign out</button>
-            </form>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/admin/account/"
+                className="flex h-8 items-center justify-center rounded-sm border border-line-light whitespace-nowrap text-paper/80 transition-colors hover:bg-white/10 hover:text-paper"
+              >
+                Account
+              </Link>
+              <form action={signOut} className="contents">
+                <button className="flex h-8 items-center justify-center rounded-sm border border-line-light whitespace-nowrap text-paper/80 transition-colors hover:bg-white/10 hover:text-paper">
+                  Sign out
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </aside>

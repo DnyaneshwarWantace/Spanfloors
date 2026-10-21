@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Dropdown from "@/components/ui/Dropdown";
 import { and, asc, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/server/auth";
@@ -96,10 +97,18 @@ export default async function ContentList({
           <input type="hidden" name="type" value={type} />
           {status !== "all" && <input type="hidden" name="status" value={status} />}
           <input name="q" defaultValue={q} placeholder="Search title or URL…" className={`${inputCls} h-8 w-56 text-2xs`} aria-label="Search" />
-          <select name="sort" defaultValue={sort} className={`${inputCls} h-8 w-auto text-2xs`} aria-label="Sort">
-            <option value="updated">Recently edited</option>
-            <option value="title">Title A–Z</option>
-          </select>
+          <Dropdown
+            name="sort"
+            defaultValue={sort}
+            submitOnChange
+            size="sm"
+            className="w-40"
+            aria-label="Sort"
+            options={[
+              { value: "updated", label: "Recently edited" },
+              { value: "title", label: "Title A–Z" },
+            ]}
+          />
           <button className={`${btn.secondary} h-8`}>Apply</button>
         </form>
       </div>

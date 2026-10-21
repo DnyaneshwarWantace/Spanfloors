@@ -69,7 +69,7 @@ export default function ProductExtrasForm({ initial, twentyImageId, defaultName 
   const move = (i: number, d: -1 | 1) => moveTo(i, i + d);
 
   return (
-    <form action={action} className="grid gap-5">
+    <form action={action} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
       <input type="hidden" name="twentyId" value={initial.twentyId} />
       <input type="hidden" name="mediaIds" value={gallery.map((g) => g.id).join(",")} />
       <input type="hidden" name="externalImageIds" value={extIds.join(",")} />

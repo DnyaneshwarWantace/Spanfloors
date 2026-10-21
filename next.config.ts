@@ -34,7 +34,6 @@ const nextConfig: NextConfig = {
           "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com",
           "connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com",
           "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.google.com",
-          "upgrade-insecure-requests",
         ].join("; "),
       },
     ];

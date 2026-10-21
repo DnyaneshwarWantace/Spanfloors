@@ -1,4 +1,5 @@
 import { updateTag } from "next/cache";
+import Dropdown from "@/components/ui/Dropdown";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -65,10 +66,15 @@ export default async function RedirectsPage({ searchParams }: { searchParams: Pr
         </label>
         <label className="grid gap-1.5 text-2xs font-medium">
           Type
-          <select name="permanent" className={inputCls}>
-            <option value="permanent">Permanent (301)</option>
-            <option value="temporary">Temporary (302)</option>
-          </select>
+          <Dropdown
+            name="permanent"
+            defaultValue="permanent"
+            aria-label="Redirect type"
+            options={[
+              { value: "permanent", label: "Permanent (301)", hint: "Moves rankings to the new URL" },
+              { value: "temporary", label: "Temporary (302)", hint: "Short-term, keeps the old URL indexed" },
+            ]}
+          />
         </label>
         <button className={btn.primary}>Add redirect</button>
       </form>

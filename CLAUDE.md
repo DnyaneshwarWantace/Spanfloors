@@ -33,3 +33,8 @@ Next.js 16 (App Router) · Tailwind CSS v4 (tokens in `src/app/globals.css` `@th
 - Settings & API keys: `src/server/settings.ts` (`SETTING_DEFS`). Secrets AES-256-GCM encrypted with `APP_SECRET` — never change APP_SECRET after go-live or saved keys become unreadable.
 - Media: files in `storage/uploads/`, served by `/media/[...path]`. Imported WP files live under `wp/`.
 - WordPress import: `npm run import:wp` (content + media records, re-runnable). Media files: prefer `-- --from-dir <uploads backup>`; the live site's firewall blocks bulk downloads.
+- Blog (blog.spanfloors.com, separate WordPress + Yoast): `npm run import:blog [-- --files]` (REST, published posts → /blog/<slug>/) and `npm run import:blog-xml -- wordpress/<export>.xml --files` (all 734 media-library items + drafts). Files live under `storage/uploads/blog/`. Old blog URLs 301 via host check in `src/proxy.ts`.
+
+## UI rules
+- **Never use a native `<select>`.** Use `src/components/ui/Dropdown.tsx` everywhere (site and admin). `grep -rn "<select" src` must return nothing.
+- Single-column grids that contain truncated text use `grid-cols-[minmax(0,1fr)]` + `min-w-0` so long text can't push the layout wider than the screen.

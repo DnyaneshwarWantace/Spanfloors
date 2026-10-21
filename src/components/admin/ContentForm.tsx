@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Dropdown from "@/components/ui/Dropdown";
 import Link from "next/link";
 import RichEditor from "./RichEditor";
 import MediaLibrary from "./MediaLibrary";
@@ -72,7 +73,7 @@ export default function ContentForm({ initial }: { initial: ContentFormData }) {
   const label = initial.type === "post" ? "blog post" : "page";
 
   return (
-    <form action={action} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <form action={action} className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
       <input type="hidden" name="id" value={initial.id ?? ""} />
       <input type="hidden" name="type" value={initial.type} />
       <input type="hidden" name="robots" value={initial.robots} />
@@ -83,14 +84,16 @@ export default function ContentForm({ initial }: { initial: ContentFormData }) {
         {state.error && <Notice tone="error">{state.error}</Notice>}
         {state.ok && <Notice tone="success">Saved {state.savedAt ? new Date(state.savedAt).toLocaleTimeString("en-IN", { timeStyle: "short" }) : ""}.</Notice>}
 
-        <input
+        <textarea
           name="title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => setTitle(e.target.value.replace(/\n/g, " "))}
+          onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
           placeholder={`${initial.type === "post" ? "Post" : "Page"} title`}
           aria-label="Title"
           required
-          className="w-full border-0 border-b border-line bg-transparent pb-3 text-display leading-tight outline-none placeholder:text-muted/60 focus:border-ink"
+          rows={1}
+          className="field-sizing-content w-full resize-none border-0 border-b border-line bg-transparent pb-3 text-display leading-tight outline-none placeholder:text-muted/60 focus:border-ink"
         />
 
         <div className="flex flex-wrap items-center gap-2 text-2xs">
@@ -103,7 +106,7 @@ export default function ContentForm({ initial }: { initial: ContentFormData }) {
               setPathTouched(true);
               setPath(e.target.value);
             }}
-            className={`${inputCls} h-8 w-auto min-w-64 flex-1 font-mono text-2xs`}
+            className={`${inputCls} h-8 w-auto min-w-0 flex-1 font-mono text-2xs`}
             aria-label="URL path"
           />
         </div>
@@ -112,17 +115,23 @@ export default function ContentForm({ initial }: { initial: ContentFormData }) {
       </div>
 
       {/* Sidebar */}
-      <aside className="grid content-start gap-5">
-        <section className="border border-line bg-white/40 p-4">
+      <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5">
+        <section className="min-w-0 border border-line bg-white/40 p-4">
           <h2 className="mb-3 text-2xs font-semibold tracking-[0.06em] uppercase">Publish</h2>
           <div className="grid gap-3">
             <Field label="Status" htmlFor="status">
-              <select id="status" name="status" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className={inputCls}>
-                <option value="draft">Draft (not visible)</option>
-                <option value="published">Published</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="archived">Archived (hidden)</option>
-              </select>
+              <Dropdown
+                id="status"
+                name="status"
+                value={status}
+                onChange={(v) => setStatus(v as typeof status)}
+                options={[
+                  { value: "draft", label: "Draft", hint: "Not visible on the website" },
+                  { value: "published", label: "Published", hint: "Live on the website" },
+                  { value: "scheduled", label: "Scheduled", hint: "Goes live at the publish date" },
+                  { value: "archived", label: "Archived", hint: "Hidden, kept for reference" },
+                ]}
+              />
             </Field>
             <Field label={status === "scheduled" ? "Publish on" : "Publish date"} htmlFor="publishedAt" hint={status === "scheduled" ? "Goes live automatically at this time (India time)." : undefined}>
               <input id="publishedAt" name="publishedAt" type="datetime-local" defaultValue={toLocalInput(initial.publishedAt)} className={inputCls} />
@@ -141,7 +150,7 @@ export default function ContentForm({ initial }: { initial: ContentFormData }) {
           </div>
         </section>
 
-        <section className="border border-line bg-white/40 p-4">
+        <section className="min-w-0 border border-line bg-white/40 p-4">
           <h2 className="mb-3 text-2xs font-semibold tracking-[0.06em] uppercase">Featured image</h2>
           {featured ? (
             <div className="grid gap-2">
@@ -164,7 +173,7 @@ export default function ContentForm({ initial }: { initial: ContentFormData }) {
           )}
         </section>
 
-        <section className="grid gap-3 border border-line bg-white/40 p-4">
+        <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 border border-line bg-white/40 p-4">
           <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Summary</h2>
           <Field label="Excerpt" htmlFor="excerpt" hint="Shown on blog listings. Leave empty to use the first lines.">
             <textarea id="excerpt" name="excerpt" value={excerpt} onChange={(e) => setExcerpt(e.target.value)} rows={3} className={`${inputCls} h-auto py-2`} />
@@ -176,10 +185,10 @@ export default function ContentForm({ initial }: { initial: ContentFormData }) {
           )}
         </section>
 
-        <section className="grid gap-3 border border-line bg-white/40 p-4">
+        <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 border border-line bg-white/40 p-4">
           <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">SEO</h2>
           {/* Google result preview */}
-          <div className="border border-line bg-white p-3" aria-label="Search result preview">
+          <div className="min-w-0 border border-line bg-white p-3" aria-label="Search result preview">
             <div className="truncate text-2xs text-[#4d5156]">
               {SITE}
               {shownPath.replace(/\/$/, "").replaceAll("/", " › ")}

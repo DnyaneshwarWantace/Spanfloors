@@ -10,6 +10,9 @@ export function tidyImported(html: string): string {
     // form plugin leftovers
     .replace(/<img[^>]*(?:wpforms|submit-spin|loading)[^>]*>/gi, "")
     .replace(/Please enable JavaScript in your browser to complete this form\.[^<]*/gi, "")
+    // old WordPress plugin leftovers (view counters)
+    .replace(/<p[^>]*>\s*Post Views:\s*[\d,]+\s*<\/p>/gi, "")
+    .replace(/Post Views:\s*[\d,]+/gi, "")
     // in-body H1 → H2
     .replace(/<h1(\s[^>]*)?>/gi, "<h2>")
     .replace(/<\/h1>/gi, "</h2>")

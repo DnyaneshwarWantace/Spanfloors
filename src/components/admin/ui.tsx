@@ -47,9 +47,6 @@ export function Textarea(props: ComponentProps<"textarea">) {
   return <textarea {...props} className={`${inputCls} h-auto min-h-24 py-2 leading-relaxed ${props.className ?? ""}`} />;
 }
 
-export function Select(props: ComponentProps<"select">) {
-  return <select {...props} className={`${inputCls} pr-8 ${props.className ?? ""}`} />;
-}
 
 export function Card({ title, children, actions }: { title?: string; children: ReactNode; actions?: ReactNode }) {
   return (

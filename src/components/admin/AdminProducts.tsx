@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Dropdown from "@/components/ui/Dropdown";
 import ProductMedia from "@/components/ProductMedia";
 import { label, TONE_COLORS } from "@/lib/labels";
 import type { getAdminProducts } from "@/lib/catalog";
@@ -32,7 +33,6 @@ const CHECKS: [string, (r: AdminRow) => boolean][] = [
   ["Sizes", (r) => r.variants.length > 0],
 ];
 
-const select = "h-9 border border-line bg-paper px-2 text-2xs outline-none focus:border-ink";
 
 function StatusPill({ live }: { live: boolean }) {
   return live ? (
@@ -235,24 +235,34 @@ export default function AdminProducts({ rows }: { rows: AdminRow[] }) {
           className="h-9 w-64 border border-line bg-paper px-3 text-2xs outline-none focus:border-ink"
           aria-label="Search products"
         />
-        <select className={select} value={status} onChange={(e) => setStatus(e.target.value as Status)} aria-label="Status">
-          <option value="all">All statuses</option>
-          <option value="live">Live</option>
-          <option value="hidden">Hidden</option>
-        </select>
-        <select className={select} value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Category">
-          <option value="all">All categories</option>
-          {categories.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-        <select className={select} value={issue} onChange={(e) => setIssue(e.target.value as Issue)} aria-label="Data issues">
-          {ISSUES.map(([k, l]) => (
-            <option key={k} value={k}>
-              {l}
-            </option>
-          ))}
-        </select>
+        <Dropdown
+          size="sm"
+          className="w-40"
+          aria-label="Status"
+          value={status}
+          onChange={(v) => setStatus(v as Status)}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "live", label: "Live" },
+            { value: "hidden", label: "Hidden" },
+          ]}
+        />
+        <Dropdown
+          size="sm"
+          className="w-52"
+          aria-label="Category"
+          value={cat}
+          onChange={setCat}
+          options={[{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))]}
+        />
+        <Dropdown
+          size="sm"
+          className="w-48"
+          aria-label="Data issues"
+          value={issue}
+          onChange={(v) => setIssue(v as Issue)}
+          options={ISSUES.map(([k, l]) => ({ value: k, label: l }))}
+        />
         <span className="ml-auto text-2xs text-muted tabular-nums">
           {visible.length} of {rows.length} products
         </span>

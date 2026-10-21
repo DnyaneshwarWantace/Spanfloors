@@ -59,7 +59,7 @@ export default async function ProductEditor({ params }: { params: Promise<{ id: 
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
         {/* Read-only Twenty data */}
         <aside className="grid content-start gap-4">
           <div className="relative aspect-[5/6] overflow-hidden bg-paper-2">

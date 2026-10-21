@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import Dropdown from "@/components/ui/Dropdown";
 import { deleteMedia, listMedia, updateMedia, uploadMedia, type MediaItem } from "@/app/admin/(panel)/media/actions";
 import { btn, inputCls } from "./ui";
 
@@ -85,12 +86,19 @@ export default function MediaLibrary({ picker = false, onPick, initialKind = "al
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search file name or alt text…" className={`${inputCls} h-9 w-64`} aria-label="Search media" />
-        <select value={kind} onChange={(e) => setKind(e.target.value as Kind)} className={`${inputCls} h-9 w-auto`} aria-label="File type">
-          <option value="all">All files</option>
-          <option value="image">Images</option>
-          <option value="document">Documents (PDF)</option>
-          <option value="video">Videos</option>
-        </select>
+        <Dropdown
+          size="sm"
+          className="w-44"
+          aria-label="File type"
+          value={kind}
+          onChange={(v) => setKind(v as Kind)}
+          options={[
+            { value: "all", label: "All files" },
+            { value: "image", label: "Images" },
+            { value: "document", label: "Documents (PDF)" },
+            { value: "video", label: "Videos" },
+          ]}
+        />
         <span className="text-2xs text-muted tabular-nums">{total.toLocaleString("en-IN")} files</span>
         <div className="ml-auto">
           <input ref={fileInput} type="file" multiple hidden accept="image/*,application/pdf,video/mp4" onChange={(e) => e.target.files && upload(e.target.files)} />

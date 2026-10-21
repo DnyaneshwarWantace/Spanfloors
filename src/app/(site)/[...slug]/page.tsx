@@ -83,7 +83,7 @@ export default async function CmsPage({ params }: Props) {
             datePublished: c.publishedAt?.toISOString(),
             dateModified: c.updatedAt.toISOString(),
             ...(c.featured ? { image: `${SITE_URL}${c.featured.url}` } : {}),
-            author: { "@type": "Organization", name: SITE_NAME },
+            author: c.authorName ? { "@type": "Person", name: c.authorName } : { "@type": "Organization", name: SITE_NAME },
             publisher: { "@id": `${SITE_URL}/#organization` },
           }}
         />
@@ -98,6 +98,7 @@ export default async function CmsPage({ params }: Props) {
                   Blog
                 </Link>
                 {c.publishedAt && <span> · {fmt(c.publishedAt)}</span>}
+                {c.authorName && <span> · {c.authorName}</span>}
               </nav>
             )}
             <h1 className="mono text-display">{c.title}</h1>
