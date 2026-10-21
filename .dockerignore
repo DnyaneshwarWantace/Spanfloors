@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env.*
+docker.env
+storage
+wordpress
+*.pdf
+.playwright-cli
+.DS_Store
+*.tsbuildinfo

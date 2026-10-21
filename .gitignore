@@ -6,7 +6,9 @@ next-env.d.ts
 # secrets & local config
 .env
 .env.*
+!.env.production.example
 docker.env
+backups/
 
 # media IS committed for testing (storage/uploads); move to S3/R2 later.
 # Never commit logs, caches or the WordPress export (has author emails).

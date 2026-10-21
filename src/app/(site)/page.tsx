@@ -1,7 +1,8 @@
 import CategoryView from "@/views/CategoryView";
 import { pageMetadata } from "@/lib/seo";
 
-export const revalidate = 300;
+// Rendered per request (the build has no API keys); Twenty data itself is cached for 5 minutes.
+export const dynamic = "force-dynamic";
 
 // Homepage keeps the current spanfloors.com title/description (from legacy SEO data).
 export const metadata = pageMetadata("/", {

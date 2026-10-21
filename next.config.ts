@@ -8,6 +8,7 @@ import type { NextConfig } from "next";
 const legacy = process.env.LEGACY_SITE_URL?.replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
+  output: "standalone", // small self-contained server for Docker
   trailingSlash: true, // spanfloors.com URLs all end with "/"
   poweredByHeader: false,
   experimental: { serverActions: { bodySizeLimit: "26mb" } }, // media uploads up to 25 MB

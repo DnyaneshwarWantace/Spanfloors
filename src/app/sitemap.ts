@@ -3,7 +3,8 @@ import { CATEGORIES, getCatalog } from "@/lib/catalog";
 import { SITE_URL } from "@/lib/seo";
 import { listLivePaths } from "@/server/content";
 
-export const revalidate = 3600;
+// Rendered per request (the build has no API keys); Twenty data itself is cached for 5 minutes.
+export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [products, pages] = await Promise.all([getCatalog().catch(() => []), listLivePaths().catch(() => [])]);

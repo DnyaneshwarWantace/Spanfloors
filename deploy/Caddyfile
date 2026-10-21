@@ -1,0 +1,10 @@
+# Automatic HTTPS (Let's Encrypt) for the site. Point the domain's DNS A record at this server first.
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
+
+# Old blog subdomain: the app 301-redirects every old blog URL to /blog/… on the main site.
+{$BLOG_DOMAIN} {
+	reverse_proxy app:3000
+}
