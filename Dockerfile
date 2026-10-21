@@ -22,7 +22,7 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/drizzle ./drizzle
-COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=build /app/scripts/migrate.mjs /app/scripts/create-admin.mjs ./scripts/
 # The start-up migration needs drizzle's migrator and pg with all their dependencies.
 RUN mkdir -p /opt/migrate && cd /opt/migrate && npm init -y >/dev/null && npm install --no-audit --no-fund drizzle-orm@0.45.4 pg@8.23.1 >/dev/null
 RUN mkdir -p /app/storage/uploads /app/storage/cache && chown -R app:app /app/storage

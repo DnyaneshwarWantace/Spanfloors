@@ -33,25 +33,20 @@ HTTPS certificates are issued automatically by Caddy on the first request (DNS m
 
 ## 5. Data (first deploy only)
 
-Copy the local database to the server (content, blog, media records, settings):
+The repository includes `deploy/seed/spanfloors-seed.sql.gz`: all pages, blog posts, media records, product extras and site settings (no users, logins or secrets). After the app has started once (step 4 creates the tables):
 
 ```bash
-# on your Mac
-docker compose --env-file docker.env exec -T db pg_dump -U spanfloors -d spanfloors | gzip > spanfloors.sql.gz
-scp spanfloors.sql.gz user@SERVER:~/spanfloors/
-# on the server
-gunzip -c spanfloors.sql.gz | docker compose -f docker-compose.prod.yml exec -T db psql -U spanfloors -d spanfloors
+gunzip -c deploy/seed/spanfloors-seed.sql.gz | docker compose -f docker-compose.prod.yml exec -T db psql -U spanfloors -d spanfloors
+```
+
+Create the admin login (use a strong password, at least 10 characters):
+
+```bash
+docker compose -f docker-compose.prod.yml exec app sh -c \
+  'NODE_PATH=/opt/migrate/node_modules node scripts/create-admin.mjs --email admin@spanfloors.com --name "Span Floors" --password "CHOOSE-A-STRONG-PASSWORD"'
 ```
 
 Media files in `storage/uploads/` come with the git repository for now (later: S3/R2).
-
-Create the admin login on the server if needed:
-
-```bash
-docker compose -f docker-compose.prod.yml exec app node -e "1"   # check the app container is up
-```
-
-(Admin accounts are copied with the database dump above.)
 
 ## 6. Updating
 
