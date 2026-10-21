@@ -6,7 +6,8 @@ import ContentForm from "@/components/admin/ContentForm";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import { btn, Notice, PageHeader } from "@/components/admin/ui";
 import { requireUser } from "@/server/auth";
-import { mediaUrl } from "@/server/storage";
+import { mediaUrl, resolveStored } from "@/server/storage";
+import { existsSync } from "node:fs";
 import { deleteContent, duplicateContent } from "../actions";
 
 export default async function EditContent({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
@@ -19,6 +20,11 @@ export default async function EditContent({ params, searchParams }: { params: Pr
     ? await db.select({ id: schema.media.id, path: schema.media.path }).from(schema.media).where(eq(schema.media.id, row.featuredMediaId))
     : [];
   const { created } = await searchParams;
+  // Images in the body whose files haven't been imported yet (the editor shows a placeholder instead).
+  const missingImages = [...new Set([...row.body.matchAll(/src="(\/media\/[^"]+)"/g)].map((m) => m[1]))].filter((src) => {
+    const full = resolveStored(decodeURIComponent(src.replace(/^\/media\//, "")));
+    return !full || !existsSync(full);
+  });
   const label = row.type === "post" ? "blog post" : "page";
 
   return (
@@ -53,6 +59,7 @@ export default async function EditContent({ params, searchParams }: { params: Pr
         </div>
       )}
       <ContentForm
+        missingImages={missingImages}
         initial={{
           id: row.id,
           type: row.type,
@@ -62,7 +69,16 @@ export default async function EditContent({ params, searchParams }: { params: Pr
           excerpt: row.excerpt,
           status: row.status,
           publishedAt: row.publishedAt?.toISOString() ?? null,
-          featured: featured ? { id: featured.id, url: mediaUrl(featured.path) } : null,
+          featured: featured
+            ? {
+                id: featured.id,
+                url: mediaUrl(featured.path),
+                available: (() => {
+                  const full = resolveStored(featured.path);
+                  return Boolean(full && existsSync(full));
+                })(),
+              }
+            : null,
           seoTitle: row.seoTitle ?? "",
           seoDescription: row.seoDescription ?? "",
           robots: row.robots ?? "",

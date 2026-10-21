@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { desc, eq, ilike, or, count, and, like, type SQL } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { logActivity, requireUser } from "@/server/auth";
-import { mediaUrl, removeStored, saveUpload } from "@/server/storage";
+import { existsSync } from "node:fs";
+import { mediaUrl, removeStored, resolveStored, saveUpload } from "@/server/storage";
 
 export type MediaItem = {
   id: string;
@@ -17,6 +18,8 @@ export type MediaItem = {
   alt: string;
   caption: string;
   createdAt: string;
+  /** False for imported records whose file hasn't been copied onto this server yet. */
+  available: boolean;
 };
 
 const toItem = (m: typeof schema.media.$inferSelect): MediaItem => ({
@@ -30,6 +33,10 @@ const toItem = (m: typeof schema.media.$inferSelect): MediaItem => ({
   alt: m.alt,
   caption: m.caption,
   createdAt: m.createdAt.toISOString(),
+  available: (() => {
+    const full = resolveStored(m.path);
+    return Boolean(full && existsSync(full));
+  })(),
 });
 
 /** Paged media search (used by the library page and the editor's image picker). */
@@ -54,6 +61,17 @@ export async function listMedia(opts: { q?: string; kind?: "image" | "document" 
     db.select({ n: count() }).from(schema.media).where(cond),
   ]);
   return { items: rows.map(toItem), total: n, page, perPage };
+}
+
+/** How many media records have their file on this server. */
+export async function mediaAvailability() {
+  await requireUser();
+  const rows = await db.select({ path: schema.media.path }).from(schema.media);
+  const available = rows.filter((r) => {
+    const full = resolveStored(r.path);
+    return Boolean(full && existsSync(full));
+  }).length;
+  return { total: rows.length, available };
 }
 
 export async function uploadMedia(form: FormData): Promise<{ items: MediaItem[]; errors: string[] }> {

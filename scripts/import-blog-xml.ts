@@ -90,7 +90,7 @@ async function main() {
       path,
       title,
       excerpt: plainText(text(it["excerpt:encoded"])).slice(0, 500),
-      body: cleanWordPressHtml(text(it["content:encoded"]), { origins: [ORIGIN], mediaPrefix: "blog", linkRewrites: [[`${ORIGIN}/`, "/blog/"]] }),
+      body: cleanWordPressHtml(text(it["content:encoded"]), { origins: [ORIGIN, "http://15.206.73.48"], mediaPrefix: "blog", linkRewrites: [[`${ORIGIN}/`, "/blog/"]] }),
       status: "draft" as const,
       legacyWpId: Number(it["wp:post_id"]),
       legacyWpType: "blog",

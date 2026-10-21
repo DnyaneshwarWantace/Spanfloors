@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Dropdown from "@/components/ui/Dropdown";
-import { deleteMedia, listMedia, updateMedia, uploadMedia, type MediaItem } from "@/app/admin/(panel)/media/actions";
+import { deleteMedia, listMedia, mediaAvailability, updateMedia, uploadMedia, type MediaItem } from "@/app/admin/(panel)/media/actions";
 import { btn, inputCls } from "./ui";
 
 type Kind = "all" | "image" | "document" | "video";
@@ -10,6 +10,18 @@ type Kind = "all" | "image" | "document" | "video";
 const fmtSize = (b: number) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : b ? `${Math.round(b / 1e3)} KB` : "—");
 
 function Thumb({ m }: { m: MediaItem }) {
+  if (!m.available) {
+    return (
+      <div className="absolute inset-0 grid place-items-center bg-paper-2 p-2 text-center text-2xs leading-snug text-muted" title="This file hasn’t been copied from the old website yet">
+        <span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="mx-auto mb-1 size-4" fill="none" stroke="currentColor" strokeWidth="1.4">
+            <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v3h16v-3" />
+          </svg>
+          Not imported yet
+        </span>
+      </div>
+    );
+  }
   if (m.mime.startsWith("image/")) {
     return (
       <img
@@ -38,6 +50,10 @@ export default function MediaLibrary({ picker = false, onPick, initialKind = "al
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [availability, setAvailability] = useState<{ total: number; available: number } | null>(null);
+  useEffect(() => {
+    mediaAvailability().then(setAvailability).catch(() => {});
+  }, []);
   const [loading, startLoad] = useTransition();
   const [uploading, startUpload] = useTransition();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -100,6 +116,11 @@ export default function MediaLibrary({ picker = false, onPick, initialKind = "al
           ]}
         />
         <span className="text-2xs text-muted tabular-nums">{total.toLocaleString("en-IN")} files</span>
+        {availability && availability.available < availability.total && (
+          <span className="text-2xs text-[#a0661f] tabular-nums" title="Records imported from the old website whose files still need copying (main WordPress backup).">
+            · {availability.available.toLocaleString("en-IN")} of {availability.total.toLocaleString("en-IN")} files on this server
+          </span>
+        )}
         <div className="ml-auto">
           <input ref={fileInput} type="file" multiple hidden accept="image/*,application/pdf,video/mp4" onChange={(e) => e.target.files && upload(e.target.files)} />
           <button type="button" className={btn.primary} onClick={() => fileInput.current?.click()} disabled={uploading}>
@@ -122,7 +143,8 @@ export default function MediaLibrary({ picker = false, onPick, initialKind = "al
           <button
             key={m.id}
             type="button"
-            onClick={() => (picker && onPick ? onPick(m) : setSelected(m))}
+            onClick={() => (picker && onPick ? m.available && onPick(m) : setSelected(m))}
+            disabled={picker && !m.available}
             className={`group text-left ${selected?.id === m.id ? "outline-2 outline-offset-2 outline-ink" : ""}`}
             title={m.filename}
           >
@@ -176,7 +198,7 @@ function Details({ m, onClose, onSaved, onDeleted }: { m: MediaItem; onClose: ()
           </button>
         </div>
         <div className="relative mb-4 aspect-[4/3] overflow-hidden bg-paper-2">
-          {m.mime.startsWith("image/") ? <img src={m.url} alt={m.alt} className="absolute inset-0 size-full object-contain" /> : <Thumb m={m} />}
+          {m.available && m.mime.startsWith("image/") ? <img src={m.url} alt={m.alt} className="absolute inset-0 size-full object-contain" /> : <Thumb m={m} />}
         </div>
         <dl className="mb-5 grid grid-cols-[6rem_1fr] gap-y-1 text-2xs">
           <dt className="text-muted">Type</dt>

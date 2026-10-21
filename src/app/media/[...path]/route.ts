@@ -40,7 +40,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ path: s
   } catch {
     // Pre-launch fallback: imported WordPress files not copied yet are fetched from the old site.
     // Remove once the full uploads backup has been imported (npm run import:wp -- --from-dir …).
-    if (rel.startsWith("wp/") && process.env.LEGACY_MEDIA_FALLBACK !== "off") {
+    // Off by default: set LEGACY_MEDIA_FALLBACK=on only while the old site is reachable for visitors.
+    if (rel.startsWith("wp/") && process.env.LEGACY_MEDIA_FALLBACK === "on") {
       return Response.redirect(`https://www.spanfloors.com/wp-content/uploads/${rel.slice(3).split("/").map(encodeURIComponent).join("/")}`, 302);
     }
     return new Response("Not found", { status: 404 });

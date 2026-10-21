@@ -17,7 +17,7 @@ export const inputCls =
 
 export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-20 -mx-6 mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-line bg-paper/90 px-6 py-5 backdrop-blur lg:-mx-10 lg:px-10">
+    <header className="sticky top-14 z-20 -mx-4 mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-line bg-paper/90 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:top-0 lg:-mx-10 lg:mb-8 lg:px-10 lg:py-5">
       <div>
         <h1 className="mono text-title">{title}</h1>
         {description && <p className="mt-1.5 text-2xs text-muted">{description}</p>}
@@ -50,7 +50,7 @@ export function Textarea(props: ComponentProps<"textarea">) {
 
 export function Card({ title, children, actions }: { title?: string; children: ReactNode; actions?: ReactNode }) {
   return (
-    <section className="border border-line bg-white/40">
+    <section className="min-w-0 border border-line bg-white/40">
       {title && (
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">{title}</h2>

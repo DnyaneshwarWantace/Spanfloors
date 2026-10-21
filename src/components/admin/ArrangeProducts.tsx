@@ -32,7 +32,7 @@ export default function ArrangeProducts({ initial, categoryTitle }: { initial: A
 
   return (
     <>
-      <div className="sticky top-[5.4rem] z-10 -mx-6 mb-5 flex flex-wrap items-center gap-3 border-b border-line bg-paper/95 px-6 py-3 backdrop-blur lg:-mx-10 lg:px-10">
+      <div className="sticky top-14 z-10 -mx-4 sm:-mx-6 lg:top-[5.4rem] mb-5 flex flex-wrap items-center gap-3 border-b border-line bg-paper/95 px-4 py-3 backdrop-blur sm:px-6 lg:-mx-10 lg:px-10">
         <button className={btn.primary} disabled={!dirty || pending} onClick={() => start(async () => {
           const r = await saveArrangement(items.map(({ id, hidden, featured }) => ({ id, hidden, featured })), categoryTitle);
           if (r.ok) { setDirty(false); setSaved("Order saved. The website updates within a minute."); } else setSaved(r.error ?? "Couldn’t save");

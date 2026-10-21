@@ -8,13 +8,15 @@ next-env.d.ts
 .env.*
 docker.env
 
-# media & data — files live in storage (and later S3/R2), never in git
-storage/
+# media IS committed for testing (storage/uploads); move to S3/R2 later.
+# Never commit logs, caches or the WordPress export (has author emails).
+storage/server.log
+storage/cache/
 wordpress/
 twenty-data-format.json
 
-# client documents (confidential)
-*.pdf
+# confidential client documents (root only — brochure PDFs in storage/uploads are public site files)
+/*.pdf
 
 # tooling output
 .playwright-cli/

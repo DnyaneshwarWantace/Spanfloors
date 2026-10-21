@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import AdminNav from "@/components/admin/AdminNav";
+import MobileNav from "@/components/admin/MobileNav";
 import { logout, requireUser } from "@/server/auth";
 
 export const metadata: Metadata = {
@@ -19,9 +20,8 @@ async function signOut() {
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
 
-  return (
-    <div className="min-h-screen bg-paper lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <aside className="flex flex-col gap-8 bg-ink px-4 py-6 text-paper lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto">
+  const sidebar = (
+    <>
         <Link href="/admin/" className="flex items-center gap-3 px-2">
           <img src="/brand/span-floors-logo.png" alt="Span Floors" width={155} height={82} className="h-9 w-auto" />
           <span className="mono text-2xs text-paper/60">Admin</span>
@@ -65,9 +65,20 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             </div>
           </div>
         </div>
-      </aside>
+    </>
+  );
 
-      <div className="min-w-0 px-6 pb-24 lg:px-10">{children}</div>
+  return (
+    <div className="min-h-screen bg-paper lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
+      {/* Phones & tablets: top bar + slide-in menu */}
+      <Suspense>
+        <MobileNav>{sidebar}</MobileNav>
+      </Suspense>
+
+      {/* Large screens: fixed sidebar */}
+      <aside className="hidden flex-col gap-8 bg-ink px-4 py-6 text-paper lg:sticky lg:top-0 lg:flex lg:h-screen lg:overflow-y-auto">{sidebar}</aside>
+
+      <div className="min-w-0 overflow-x-clip px-4 pb-24 sm:px-6 lg:px-10">{children}</div>
     </div>
   );
 }

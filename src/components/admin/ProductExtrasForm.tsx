@@ -201,7 +201,7 @@ export default function ProductExtrasForm({ initial, twentyImageId, defaultName 
         </Field>
       </section>
 
-      <div className="sticky bottom-0 -mx-6 flex items-center gap-3 border-t border-line bg-paper/95 px-6 py-3 backdrop-blur lg:-mx-10 lg:px-10">
+      <div className="sticky bottom-0 -mx-4 flex flex-wrap sm:-mx-6 items-center gap-3 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur sm:px-6 lg:-mx-10 lg:px-10">
         <button className={btn.primary} disabled={pending}>
           {pending ? "Saving…" : "Save product"}
         </button>

@@ -96,11 +96,12 @@ async function main() {
       title: decodeEntities(p.title.rendered).trim() || p.slug,
       excerpt: plainText(p.excerpt.rendered).slice(0, 500),
       body: cleanWordPressHtml(p.content.rendered, {
-        origins: [ORIGIN, "http://blog.spanfloors.com"],
+        origins: [ORIGIN, "http://blog.spanfloors.com", "http://15.206.73.48", "https://15.206.73.48"],
         mediaPrefix: "blog",
         // Links between blog posts point at their new /blog/ addresses; links to the main site become relative.
         linkRewrites: [
           [`${ORIGIN}/`, "/blog/"],
+          ["http://15.206.73.48/", "/blog/"],
           ["https://www.spanfloors.com/", "/"],
           ["https://spanfloors.com/", "/"],
         ],

@@ -13,6 +13,9 @@ export function tidyImported(html: string): string {
     // old WordPress plugin leftovers (view counters)
     .replace(/<p[^>]*>\s*Post Views:\s*[\d,]+\s*<\/p>/gi, "")
     .replace(/Post Views:\s*[\d,]+/gi, "")
+    // stray spaces inside link/image addresses (e.g. src=" https://…")
+    .replace(/(src|href)="\s+/gi, '$1="')
+    .replace(/(src|href)="([^"]*?)\s+"/gi, '$1="$2"')
     // in-body H1 → H2
     .replace(/<h1(\s[^>]*)?>/gi, "<h2>")
     .replace(/<\/h1>/gi, "</h2>")

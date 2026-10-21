@@ -69,7 +69,7 @@ export default async function AdminPage() {
 
   return (
     <div>
-      <header className="sticky top-0 z-20 -mx-6 mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-line bg-paper/90 px-6 py-4 backdrop-blur lg:-mx-10 lg:px-10">
+      <header className="sticky top-14 z-20 -mx-4 mb-6 sm:-mx-6 lg:top-0 lg:mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-line bg-paper/90 px-4 py-4 backdrop-blur sm:px-6 lg:-mx-10 lg:px-10">
         <div>
           <h1 className="mono text-title">Products from Twenty</h1>
           <p className="mt-1 text-2xs text-muted">

@@ -76,7 +76,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </Link>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
         {stats.map((s) => (
           <Link key={s.label} href={s.href} className="group border-l border-line pl-3">
             <div className="text-2xs text-muted">{s.label}</div>
@@ -86,11 +86,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         ))}
       </div>
 
-      <div className="mt-10 grid gap-6 lg:grid-cols-2">
+      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
         <Card title="Recently edited">
           <ul className="divide-y divide-line">
             {recent.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-4 py-2.5 text-2xs">
+              <li key={r.id} className="flex min-w-0 flex-col gap-0.5 py-2.5 text-2xs sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <Link href={`/admin/content/${r.id}/?type=${r.type}`} className="min-w-0 truncate text-body hover:underline">
                   {r.title}
                 </Link>
@@ -105,8 +105,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {activity.length ? (
             <ul className="divide-y divide-line">
               {activity.map((a, i) => (
-                <li key={i} className="flex justify-between gap-4 py-2.5 text-2xs">
-                  <span>
+                <li key={i} className="flex min-w-0 flex-col gap-0.5 py-2.5 text-2xs sm:flex-row sm:justify-between sm:gap-4">
+
+                  <span className="min-w-0 break-words">
                     {a.name && <strong className="font-medium">{a.name}: </strong>}
                     {a.summary}
                   </span>

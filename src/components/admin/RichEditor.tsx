@@ -3,7 +3,44 @@
 import { useEffect, useState } from "react";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
+import BaseImage from "@tiptap/extension-image";
+
+/** Shown instead of images whose file hasn't been imported yet (no request to the server). */
+const MISSING_SRC =
+  "data:image/svg+xml;charset=utf-8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="200" viewBox="0 0 640 200"><rect width="640" height="200" fill="#ede8e2"/><text x="320" y="96" font-family="Arial" font-size="15" fill="#7a7976" text-anchor="middle">Image not imported yet</text><text x="320" y="122" font-family="Arial" font-size="12" fill="#a8a6a1" text-anchor="middle">It will appear once the old website files are imported</text></svg>',
+  );
+
+// Keeps the real address of a not-yet-imported image while the editor shows the placeholder.
+const Image = BaseImage.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      originalSrc: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-original-src"),
+        renderHTML: (attrs) => (attrs.originalSrc ? { "data-original-src": attrs.originalSrc } : {}),
+      },
+    };
+  },
+});
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Before editing: swap missing images for the placeholder (remembering the real src). */
+function toEditor(html: string, missing: string[]) {
+  let out = html;
+  for (const src of missing) {
+    out = out.replace(new RegExp(`src="${escapeRe(src)}"`, "g"), `src="${MISSING_SRC}" data-original-src="${src}"`);
+  }
+  return out;
+}
+
+/** Before saving: put the real image addresses back. */
+function fromEditor(html: string) {
+  return html.replace(/src="data:image\/svg\+xml[^"]*"\s+data-original-src="([^"]+)"/g, 'src="$1"').replace(/data-original-src="([^"]+)"\s+src="data:image\/svg\+xml[^"]*"/g, 'src="$1"');
+}
 import Placeholder from "@tiptap/extension-placeholder";
 import MediaLibrary from "./MediaLibrary";
 import { btn, inputCls } from "./ui";
@@ -109,7 +146,18 @@ function Toolbar({ editor, onImage, html, onToggleHtml }: { editor: Editor; onIm
 }
 
 /** Rich-text editor. Writes its HTML into a hidden input named `name` so it submits with the form. */
-export default function RichEditor({ name, initialHtml, placeholder = "Start writing…" }: { name: string; initialHtml: string; placeholder?: string }) {
+export default function RichEditor({
+  name,
+  initialHtml,
+  placeholder = "Start writing…",
+  missingImages = [],
+}: {
+  name: string;
+  initialHtml: string;
+  placeholder?: string;
+  /** /media/ addresses whose files aren't on the server yet (shown as placeholders). */
+  missingImages?: string[];
+}) {
   const [value, setValue] = useState(initialHtml);
   const [htmlMode, setHtmlMode] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -118,22 +166,22 @@ export default function RichEditor({ name, initialHtml, placeholder = "Start wri
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: { levels: [2, 3, 4] }, link: { openOnClick: false, autolink: true } }),
-      Image.configure({ inline: false }),
+      Image.configure({ inline: false, allowBase64: true }),
       Placeholder.configure({ placeholder }),
     ],
-    content: initialHtml,
+    content: toEditor(initialHtml, missingImages),
     editorProps: {
       attributes: {
         class:
           "prose-cms min-h-[28rem] max-w-full px-6 py-5 text-body leading-relaxed break-words outline-none [&_img]:h-auto [&_img]:max-w-full [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_iframe]:max-w-full [&_pre]:overflow-x-auto [&_a]:break-all [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-ink [&_blockquote]:pl-4 [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lead [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:text-title [&_img]:my-4 [&_img]:max-h-96 [&_iframe]:my-4 [&_iframe]:aspect-video [&_iframe]:w-full [&_iframe]:max-w-2xl [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_.is-editor-empty:first-child::before]:pointer-events-none [&_.is-editor-empty:first-child::before]:float-left [&_.is-editor-empty:first-child::before]:h-0 [&_.is-editor-empty:first-child::before]:text-muted [&_.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
       },
     },
-    onUpdate: ({ editor: e }) => setValue(e.getHTML()),
+    onUpdate: ({ editor: e }) => setValue(fromEditor(e.getHTML())),
   });
 
   // Keep the visual editor in sync when returning from HTML mode.
   useEffect(() => {
-    if (editor && !htmlMode && editor.getHTML() !== value) editor.commands.setContent(value, { emitUpdate: false });
+    if (editor && !htmlMode && fromEditor(editor.getHTML()) !== value) editor.commands.setContent(toEditor(value, missingImages), { emitUpdate: false });
   }, [htmlMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

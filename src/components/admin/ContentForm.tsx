@@ -17,7 +17,7 @@ export type ContentFormData = {
   excerpt: string;
   status: "draft" | "published" | "scheduled" | "archived";
   publishedAt: string | null;
-  featured: { id: string; url: string } | null;
+  featured: { id: string; url: string; available?: boolean } | null;
   seoTitle: string;
   seoDescription: string;
   robots: string;
@@ -56,7 +56,7 @@ function Counter({ value, ideal }: { value: string; ideal: [number, number] }) {
   );
 }
 
-export default function ContentForm({ initial }: { initial: ContentFormData }) {
+export default function ContentForm({ initial, missingImages = [] }: { initial: ContentFormData; missingImages?: string[] }) {
   const [state, action, pending] = useActionState<SaveState, FormData>(saveContent, {});
   const [title, setTitle] = useState(initial.title);
   const [path, setPath] = useState(initial.path);
@@ -111,7 +111,7 @@ export default function ContentForm({ initial }: { initial: ContentFormData }) {
           />
         </div>
 
-        <RichEditor name="body" initialHtml={initial.body} placeholder={`Write the ${label}…`} />
+        <RichEditor name="body" initialHtml={initial.body} missingImages={missingImages} placeholder={`Write the ${label}…`} />
       </div>
 
       {/* Sidebar */}
@@ -155,7 +155,13 @@ export default function ContentForm({ initial }: { initial: ContentFormData }) {
           {featured ? (
             <div className="grid gap-2">
               <div className="relative aspect-[16/10] overflow-hidden bg-paper-2">
-                <img src={featured.url} alt="" className="absolute inset-0 size-full object-cover" />
+                {featured.available === false ? (
+                  <div className="absolute inset-0 grid place-items-center p-3 text-center text-2xs text-muted">
+                    Featured image not imported yet. It will appear once the old website files are imported.
+                  </div>
+                ) : (
+                  <img src={featured.url} alt="" className="absolute inset-0 size-full object-cover" />
+                )}
               </div>
               <div className="flex gap-2">
                 <button type="button" className={btn.secondary} onClick={() => setPicking(true)}>

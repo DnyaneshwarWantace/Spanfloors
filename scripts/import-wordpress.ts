@@ -101,6 +101,8 @@ function cleanBody(html: string): string {
   });
   return clean
     .replaceAll(UPLOADS, "/media/wp/")
+    .replace(/https?:\/\/(www\.)?spanfloors\.net\/wp-content\/uploads\//g, "/media/wp/")
+    .replace(/https?:\/\/blog\.spanfloors\.com\/wp-content\/uploads\//g, "/media/blog/")
     .replaceAll(`${ORIGIN.replace("www.", "")}/wp-content/uploads/`, "/media/wp/")
     .replaceAll(`href="${ORIGIN}/`, 'href="/')
     .replace(/\n{3,}/g, "\n\n")
