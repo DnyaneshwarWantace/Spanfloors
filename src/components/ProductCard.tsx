@@ -8,6 +8,8 @@ export type CardProduct = {
   subtitle: string;
   image: string | null;
   tone: string | null;
+  /** Badge from the admin, e.g. "New". */
+  badge?: string | null;
 };
 
 export default function ProductCard({ p, dark = false }: { p: CardProduct; dark?: boolean }) {
@@ -17,6 +19,7 @@ export default function ProductCard({ p, dark = false }: { p: CardProduct; dark?
         <div className="absolute inset-0 transition-transform duration-[1200ms] ease-butter group-hover:scale-[1.03]">
           <ProductMedia src={p.image} alt={p.name} tone={p.tone} />
         </div>
+        {p.badge && <span className="absolute top-2.5 left-2.5 z-10 bg-paper px-2 py-0.5 text-2xs text-ink">{p.badge}</span>}
         <span aria-hidden="true" className="absolute top-2.5 right-2.5 z-10 grid size-[1.6rem] place-items-center bg-ink/70 text-base leading-none text-paper">
           +
         </span>

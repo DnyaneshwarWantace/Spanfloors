@@ -1,12 +1,22 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Dropdown from "@/components/ui/Dropdown";
 import Link from "next/link";
 import RichEditor from "./RichEditor";
 import MediaLibrary from "./MediaLibrary";
 import { btn, Field, inputCls, Notice } from "./ui";
 import { saveContent, type SaveState } from "@/app/admin/(panel)/content/actions";
+import type { ReusableItem } from "@/app/admin/(panel)/content/builder-actions";
+import SectionsEditor from "./builder/SectionsEditor";
+import SeoPanel from "./SeoPanel";
+import AeoPanel from "./AeoPanel";
+import RelatedPostsPicker from "./RelatedPostsPicker";
+import { cleanAeo, type Aeo } from "@/server/aeo";
+import PreviewModal from "./PreviewModal";
+import VersionHistory from "./VersionHistory";
+import { editingHeartbeat, editingLeft, previewFromForm } from "@/app/admin/(panel)/content/preview-actions";
+import type { Section } from "@/sections/types";
 
 export type ContentFormData = {
   id: string | null;
@@ -15,8 +25,10 @@ export type ContentFormData = {
   path: string;
   body: string;
   excerpt: string;
-  status: "draft" | "published" | "scheduled" | "archived";
+  status: "draft" | "review" | "published" | "scheduled" | "archived";
   publishedAt: string | null;
+  /** Optional end date: the item stops being live after this. */
+  unpublishAt?: string | null;
   featured: { id: string; url: string; available?: boolean } | null;
   seoTitle: string;
   seoDescription: string;
@@ -24,7 +36,44 @@ export type ContentFormData = {
   canonicalUrl: string;
   tags: string[];
   updatedAt: string | null;
+  layout: Section[];
+  focusKeyword?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: { id: string; url: string } | null;
+  schemaType?: string;
+  aeo?: Aeo;
+  /** Set for fixed site pages (home, blog, collections): the URL can't change. */
+  systemKey?: string | null;
+  /** Posts only: byline, the author profiles to choose from, and hand-picked related posts. */
+  authorName?: string | null;
+  authorChoices?: string[];
+  related?: { id: string; title: string }[];
 };
+
+const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `s${Date.now().toString(36)}`);
+
+/** Warns before leaving the page while there are unsaved changes (browser close/reload and admin links). */
+function useUnsavedWarning(dirty: boolean) {
+  useEffect(() => {
+    if (!dirty) return;
+    const beforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement).closest("a[href]") as HTMLAnchorElement | null;
+      if (!a || a.target === "_blank" || e.metaKey || e.ctrlKey || a.getAttribute("href")?.startsWith("#")) return;
+      if (!window.confirm("You have unsaved changes. Leave without saving?")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [dirty]);
+}
 
 const SITE = "www.spanfloors.com";
 
@@ -46,43 +95,163 @@ function suggestPath(title: string, type: "post" | "page") {
   return slug ? (type === "post" ? `/blog/${slug}/` : `/${slug}/`) : "";
 }
 
-function Counter({ value, ideal }: { value: string; ideal: [number, number] }) {
-  const n = value.length;
-  const tone = n === 0 ? "text-muted" : n < ideal[0] || n > ideal[1] ? "text-[#a0661f]" : "text-[#2f6339]";
-  return (
-    <span className={`text-2xs tabular-nums ${tone}`}>
-      {n} / {ideal[1]}
-    </span>
-  );
-}
 
-export default function ContentForm({ initial, missingImages = [] }: { initial: ContentFormData; missingImages?: string[] }) {
+export default function ContentForm({
+  initial,
+  missingImages = [],
+  canPublish = true,
+  reusable = [],
+  canReuse = false,
+}: {
+  initial: ContentFormData;
+  missingImages?: string[];
+  canPublish?: boolean;
+  reusable?: ReusableItem[];
+  canReuse?: boolean;
+}) {
   const [state, action, pending] = useActionState<SaveState, FormData>(saveContent, {});
+  const isPage = initial.type === "page";
+  // Imported pages keep their old body until it is turned into sections.
+  const [legacyBody, setLegacyBody] = useState(isPage ? initial.body : "");
+  const [layout, setLayout] = useState<Section[]>(initial.layout);
+  const [layoutKey, setLayoutKey] = useState(0);
+  const [showExtra, setShowExtra] = useState(!isPage && initial.layout.length > 0);
+  const [dirty, setDirty] = useState(false);
+  // Bumped on every change so the SEO checklist re-runs.
+  const [changeTick, setChangeTick] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
+  useUnsavedWarning(dirty);
+  useEffect(() => {
+    if (state.ok) setDirty(false);
+  }, [state]);
+
+  // Preview of the current (unsaved) state.
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const openPreview = async () => {
+    if (!formRef.current) return;
+    setPreviewing(true);
+    setPreviewError("");
+    const r = await previewFromForm(new FormData(formRef.current)).catch(() => ({ id: undefined, error: "Couldn't make the preview. Try again." }));
+    setPreviewing(false);
+    if (r.id) setPreviewId(r.id);
+    else setPreviewError(r.error ?? "Couldn't make the preview.");
+  };
+
+  // Who else has this page open, and whether someone saved it after this editor was loaded.
+  const [loadedAt, setLoadedAt] = useState(initial.updatedAt ?? "");
+  const [others, setOthers] = useState<{ name: string; secondsAgo: number }[]>([]);
+  const [savedElsewhere, setSavedElsewhere] = useState(false);
+  const [force, setForce] = useState(false);
+  useEffect(() => {
+    if (state.ok && state.updatedAt) {
+      setLoadedAt(state.updatedAt);
+      setSavedElsewhere(false);
+      setForce(false);
+    }
+  }, [state]);
+  useEffect(() => {
+    const id = initial.id;
+    if (!id) return;
+    let alive = true;
+    const beat = () =>
+      editingHeartbeat(id)
+        .then((r) => {
+          if (!alive) return;
+          setOthers(r.others);
+          if (r.updatedAt && loadedAt && new Date(r.updatedAt).getTime() > new Date(loadedAt).getTime() + 1000) setSavedElsewhere(true);
+        })
+        .catch(() => undefined);
+    beat();
+    const t = setInterval(beat, 30_000);
+    const leave = () => editingLeft(id).catch(() => undefined);
+    window.addEventListener("pagehide", leave);
+    return () => {
+      alive = false;
+      clearInterval(t);
+      window.removeEventListener("pagehide", leave);
+      leave();
+    };
+  }, [initial.id, loadedAt]);
+
+  const convertBody = () => {
+    const text: Section = { id: newId(), type: "text", data: { kicker: "", heading: "", body: legacyBody, width: "narrow" } };
+    setLayout((l) => [text, ...l]);
+    setLegacyBody("");
+    setLayoutKey((k) => k + 1);
+    setDirty(true);
+  };
   const [title, setTitle] = useState(initial.title);
   const [path, setPath] = useState(initial.path);
   const [pathTouched, setPathTouched] = useState(Boolean(initial.id));
   const [status, setStatus] = useState(initial.status);
   const [featured, setFeatured] = useState(initial.featured);
   const [picking, setPicking] = useState(false);
-  const [seoTitle, setSeoTitle] = useState(initial.seoTitle);
-  const [seoDescription, setSeoDescription] = useState(initial.seoDescription);
   const [excerpt, setExcerpt] = useState(initial.excerpt);
-  const [noindex, setNoindex] = useState(/noindex/.test(initial.robots));
 
   const shownPath = pathTouched ? path : suggestPath(title, initial.type) || path;
   const label = initial.type === "post" ? "blog post" : "page";
 
   return (
-    <form action={action} className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <form
+      ref={formRef}
+      action={action}
+      onInput={() => {
+        setDirty(true);
+        setChangeTick((t) => t + 1);
+      }}
+      className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
+    >
       <input type="hidden" name="id" value={initial.id ?? ""} />
       <input type="hidden" name="type" value={initial.type} />
       <input type="hidden" name="robots" value={initial.robots} />
       <input type="hidden" name="featuredMediaId" value={featured?.id ?? ""} />
+      <input type="hidden" name="loadedAt" value={loadedAt} />
+      <input type="hidden" name="force" value={force ? "1" : ""} />
 
       {/* Main column */}
       <div className="grid min-w-0 content-start gap-5">
-        {state.error && <Notice tone="error">{state.error}</Notice>}
+        {others.length > 0 && (
+          <Notice>
+            <b>{others.map((o) => o.name).join(" and ")}</b> {others.length === 1 ? "is" : "are"} also editing this {initial.type === "post" ? "post" : "page"} right now. Agree who saves first, or changes may be overwritten.
+          </Notice>
+        )}
+        {savedElsewhere && !state.conflict && (
+          <Notice tone="error">Someone else saved this {initial.type === "post" ? "post" : "page"} after you opened it. Reload to see their changes before you save.</Notice>
+        )}
+        {state.conflict && (
+          <Notice tone="error">
+            <p>{state.error}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" className={btn.secondary} onClick={() => window.location.reload()}>
+                Reload their version
+              </button>
+              <button
+                type="button"
+                className={btn.danger}
+                onClick={() => {
+                  setForce(true);
+                  requestAnimationFrame(() => formRef.current?.requestSubmit());
+                }}
+              >
+                Save mine anyway
+              </button>
+            </div>
+          </Notice>
+        )}
+        {state.error && !state.conflict && <Notice tone="error">{state.error}</Notice>}
         {state.ok && <Notice tone="success">Saved {state.savedAt ? new Date(state.savedAt).toLocaleTimeString("en-IN", { timeStyle: "short" }) : ""}.</Notice>}
+        {state.warnings && state.warnings.length > 0 && (
+          <Notice>
+            <p className="mb-1 font-medium">Saved, but some sections are missing content. Fill these in before publishing:</p>
+            <ul className="list-disc pl-5">
+              {state.warnings.slice(0, 8).map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          </Notice>
+        )}
 
         <textarea
           name="title"
@@ -102,16 +271,64 @@ export default function ContentForm({ initial, missingImages = [] }: { initial: 
           <input
             name="path"
             value={shownPath}
+            readOnly={Boolean(initial.systemKey)}
+            title={initial.systemKey ? "This site page's address can't be changed." : undefined}
             onChange={(e) => {
               setPathTouched(true);
               setPath(e.target.value);
             }}
-            className={`${inputCls} h-8 w-auto min-w-0 flex-1 font-mono text-2xs`}
+            className={`${inputCls} h-8 w-auto min-w-0 flex-1 font-mono text-2xs ${initial.systemKey ? "bg-paper-2 text-muted" : ""}`}
             aria-label="URL path"
           />
         </div>
 
-        <RichEditor name="body" initialHtml={initial.body} missingImages={missingImages} placeholder={`Write the ${label}…`} />
+        {isPage ? (
+          <>
+            {initial.systemKey && (
+              <Notice>
+                This is a fixed site page. Its product list or blog list is built automatically. Sections you add show below it; add a “Product list” section to choose where the products sit, so sections above it show above the products. On collection pages the Excerpt is the intro under the heading.
+              </Notice>
+            )}
+            {legacyBody ? (
+              <section className="grid gap-3 border border-line bg-white/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Imported content</h2>
+                    <p className="mt-1 text-2xs text-muted">This page came from the old website as one block of text. Turn it into a Text section to edit it with the page builder.</p>
+                  </div>
+                  <button type="button" className={btn.secondary} onClick={convertBody}>
+                    Turn into sections
+                  </button>
+                </div>
+                <RichEditor name="body" initialHtml={legacyBody} missingImages={missingImages} onChange={setLegacyBody} placeholder={`Write the ${label}…`} />
+              </section>
+            ) : (
+              <input type="hidden" name="body" value="" />
+            )}
+            <div className="grid gap-2">
+              <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Page sections</h2>
+              <SectionsEditor key={layoutKey} initial={layout} kind={initial.systemKey ? "system" : "page"} reusable={reusable} canReuse={canReuse} onChange={(l) => (setLayout(l), setDirty(true), setChangeTick((t) => t + 1))} />
+            </div>
+          </>
+        ) : (
+          <>
+            <RichEditor name="body" initialHtml={initial.body} missingImages={missingImages} placeholder={`Write the ${label}…`} onChange={() => (setDirty(true), setChangeTick((t) => t + 1))} />
+            {showExtra ? (
+              <div className="grid gap-2">
+                <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Extra sections after the article</h2>
+                <SectionsEditor initial={layout} kind="post" reusable={reusable} canReuse={canReuse} onChange={(l) => (setLayout(l), setDirty(true))} />
+              </div>
+            ) : (
+              <>
+                <input type="hidden" name="layout" value="[]" />
+                <button type="button" className={`${btn.ghost} w-fit`} onClick={() => setShowExtra(true)}>
+                  + Add extra sections after the article (call to action, products, questions…)
+                </button>
+              </>
+            )}
+          </>
+        )}
+        <AeoPanel initial={initial.aeo ?? cleanAeo({})} type={initial.type} />
       </div>
 
       {/* Sidebar */}
@@ -125,30 +342,49 @@ export default function ContentForm({ initial, missingImages = [] }: { initial: 
                 name="status"
                 value={status}
                 onChange={(v) => setStatus(v as typeof status)}
-                options={[
-                  { value: "draft", label: "Draft", hint: "Not visible on the website" },
-                  { value: "published", label: "Published", hint: "Live on the website" },
-                  { value: "scheduled", label: "Scheduled", hint: "Goes live at the publish date" },
-                  { value: "archived", label: "Archived", hint: "Hidden, kept for reference" },
-                ]}
+                options={
+                  canPublish
+                    ? [
+                        { value: "draft", label: "Draft", hint: "Not visible on the website" },
+                        { value: "review", label: "Waiting for review", hint: "Written, not yet approved" },
+                        { value: "published", label: "Published", hint: "Live on the website" },
+                        { value: "scheduled", label: "Scheduled", hint: "Goes live at the publish date" },
+                        { value: "archived", label: "Archived", hint: "Hidden, kept for reference" },
+                      ]
+                    : [
+                        { value: "draft", label: "Draft", hint: "Only you and editors see it" },
+                        { value: "review", label: "Send for review", hint: "An editor checks and publishes it" },
+                      ]
+                }
               />
             </Field>
             <Field label={status === "scheduled" ? "Publish on" : "Publish date"} htmlFor="publishedAt" hint={status === "scheduled" ? "Goes live automatically at this time (India time)." : undefined}>
               <input id="publishedAt" name="publishedAt" type="datetime-local" defaultValue={toLocalInput(initial.publishedAt)} className={inputCls} />
             </Field>
+            {canPublish && (
+              <Field label="Take offline on (optional)" htmlFor="unpublishAt" hint="For offers and campaigns: the page stops showing after this time.">
+                <input id="unpublishAt" name="unpublishAt" type="datetime-local" defaultValue={toLocalInput(initial.unpublishAt ?? null)} className={inputCls} />
+              </Field>
+            )}
             <div className="flex flex-wrap gap-2 pt-1">
               <button type="submit" className={`${btn.primary} flex-1`} disabled={pending}>
-                {pending ? "Saving…" : initial.id ? "Save changes" : `Create ${label}`}
+                {pending ? "Saving…" : !canPublish && status === "review" ? "Send for review" : initial.id ? "Save changes" : `Create ${label}`}
+              </button>
+              <button type="button" className={btn.secondary} onClick={openPreview} disabled={previewing}>
+                {previewing ? "Opening…" : "Preview"}
               </button>
               {initial.id && status === "published" && (
-                <Link href={shownPath} target="_blank" className={btn.secondary}>
-                  View ↗
+                <Link href={shownPath} target="_blank" className={btn.ghost}>
+                  View live ↗
                 </Link>
               )}
             </div>
+            {previewError && <p className="text-2xs text-brand">{previewError}</p>}
             {initial.updatedAt && <p className="text-2xs text-muted">Last saved {new Date(initial.updatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</p>}
           </div>
         </section>
+
+        {initial.id && <VersionHistory contentId={initial.id} type={initial.type} />}
 
         <section className="min-w-0 border border-line bg-white/40 p-4">
           <h2 className="mb-3 text-2xs font-semibold tracking-[0.06em] uppercase">Featured image</h2>
@@ -189,35 +425,50 @@ export default function ContentForm({ initial, missingImages = [] }: { initial: 
               <input id="tags" name="tags" defaultValue={initial.tags.join(", ")} className={inputCls} />
             </Field>
           )}
+          {initial.type === "post" && (
+            <Field label="Author" htmlFor="authorName" hint="Profiles are set up under Blog authors.">
+              <Dropdown
+                id="authorName"
+                name="authorName"
+                defaultValue={initial.authorName ?? ""}
+                options={[
+                  { value: "", label: "Span Floors (no named author)" },
+                  ...[...new Set([...(initial.authorChoices ?? []), ...(initial.authorName ? [initial.authorName] : [])])].map((a) => ({ value: a, label: a })),
+                ]}
+              />
+            </Field>
+          )}
+          {initial.type === "post" && (
+            <div className="grid gap-1.5">
+              <span className="text-2xs font-medium">Related posts</span>
+              <span className="text-2xs text-muted">Shown first under the article. Without picks, posts sharing a tag are shown.</span>
+              <RelatedPostsPicker initial={initial.related ?? []} selfId={initial.id} />
+            </div>
+          )}
         </section>
 
-        <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 border border-line bg-white/40 p-4">
-          <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">SEO</h2>
-          {/* Google result preview */}
-          <div className="min-w-0 border border-line bg-white p-3" aria-label="Search result preview">
-            <div className="truncate text-2xs text-[#4d5156]">
-              {SITE}
-              {shownPath.replace(/\/$/, "").replaceAll("/", " › ")}
-            </div>
-            <div className="mt-0.5 line-clamp-1 text-[1.05rem] leading-snug text-[#1a0dab]">{seoTitle || `${title || "Untitled"} - Span Floors`}</div>
-            <div className="mt-0.5 line-clamp-2 text-2xs leading-snug text-[#4d5156]">{seoDescription || excerpt || "Add a meta description to control this text."}</div>
-          </div>
-          <Field label="SEO title" htmlFor="seoTitle">
-            <input id="seoTitle" name="seoTitle" value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} placeholder={`${title} - Span Floors`} className={inputCls} />
-            <Counter value={seoTitle} ideal={[30, 60]} />
-          </Field>
-          <Field label="Meta description" htmlFor="seoDescription">
-            <textarea id="seoDescription" name="seoDescription" value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} rows={3} className={`${inputCls} h-auto py-2`} />
-            <Counter value={seoDescription} ideal={[70, 160]} />
-          </Field>
-          <label className="flex items-center gap-2 text-2xs">
-            <input type="checkbox" name="noindex" checked={noindex} onChange={(e) => setNoindex(e.target.checked)} />
-            Hide from search engines (noindex)
-          </label>
-          <Field label="Canonical URL (optional)" htmlFor="canonicalUrl">
-            <input id="canonicalUrl" name="canonicalUrl" defaultValue={initial.canonicalUrl} placeholder="Leave empty for this page’s own URL" className={inputCls} />
-          </Field>
-        </section>
+        <SeoPanel
+          initial={{
+            seoTitle: initial.seoTitle,
+            seoDescription: initial.seoDescription,
+            focusKeyword: initial.focusKeyword ?? "",
+            robots: initial.robots,
+            canonicalUrl: initial.canonicalUrl,
+            ogTitle: initial.ogTitle ?? "",
+            ogDescription: initial.ogDescription ?? "",
+            ogImage: initial.ogImage ?? null,
+            schemaType: initial.schemaType ?? "",
+          }}
+          title={title}
+          excerpt={excerpt}
+          path={shownPath}
+          type={initial.type}
+          photo={featured && featured.available !== false ? featured.url : null}
+          formRef={formRef}
+          changeTick={changeTick}
+          contentId={initial.id}
+          isLive={initial.status === "published"}
+        />
       </aside>
 
       {picking && (
@@ -240,6 +491,7 @@ export default function ContentForm({ initial, missingImages = [] }: { initial: 
           </div>
         </div>
       )}
+      {previewId && <PreviewModal previewId={previewId} title="Preview (unsaved changes included)" onClose={() => setPreviewId(null)} />}
     </form>
   );
 }

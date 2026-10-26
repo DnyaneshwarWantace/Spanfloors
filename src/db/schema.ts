@@ -1,9 +1,10 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /* ---------- Users & sessions ---------- */
 
-export const roleEnum = pgEnum("role", ["admin", "editor"]);
+/** admin: everything · editor: content, media, products, leads, site settings · author: own blog posts (sent for review) · sales: leads only. */
+export const roleEnum = pgEnum("role", ["admin", "editor", "author", "sales"]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -13,6 +14,14 @@ export const users = pgTable("users", {
   role: roleEnum("role").notNull().default("editor"),
   active: boolean("active").notNull().default(true),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  /** Two-step login: authenticator secret (encrypted with APP_SECRET), on once confirmed with a code. */
+  totpSecret: text("totp_secret"),
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
+  /** SHA-256 hashes of unused one-time recovery codes. */
+  recoveryCodes: text("recovery_codes")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -51,16 +60,31 @@ export const media = pgTable(
     /** Original URL on the WordPress site (for imported files and URL rewriting). */
     legacyUrl: text("legacy_url").unique(),
     legacyWpId: integer("legacy_wp_id").unique(),
+    /** Point (0–100 % from left/top) kept in view when the photo is cropped into a frame. */
+    focalX: integer("focal_x").notNull().default(50),
+    focalY: integer("focal_y").notNull().default(50),
+    /** "cover" fills the frame (cropping around the focal point); "contain" shows the whole photo. */
+    fit: text("fit").notNull().default("cover"),
+    credit: text("credit").notNull().default(""),
+    /** Stand-in photo waiting to be replaced: never used as a share image. */
+    placeholder: boolean("placeholder").notNull().default(false),
+    /** Generated smaller copies: { "800": "2026/10/x-800.webp", … }. */
+    variants: jsonb("variants").notNull().default({}),
+    /** SHA-256 of the file, to catch the same file uploaded twice. */
+    sha256: text("sha256"),
+    /** Library folder, e.g. "Projects/Bali House" (empty = no folder). */
+    folder: text("folder").notNull().default(""),
     uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("media_created_idx").on(t.createdAt)],
+  (t) => [index("media_created_idx").on(t.createdAt), index("media_sha_idx").on(t.sha256), index("media_folder_idx").on(t.folder)],
 );
 
 /* ---------- Content: blog posts & pages ---------- */
 
 export const contentTypeEnum = pgEnum("content_type", ["post", "page"]);
-export const contentStatusEnum = pgEnum("content_status", ["draft", "published", "scheduled", "archived"]);
+/** "review": written by an author, waiting for an editor to publish. */
+export const contentStatusEnum = pgEnum("content_status", ["draft", "review", "published", "scheduled", "archived"]);
 
 export const content = pgTable(
   "content",
@@ -73,15 +97,29 @@ export const content = pgTable(
     excerpt: text("excerpt").notNull().default(""),
     /** Sanitised HTML body (rich-text editor output, or cleaned HTML imported from WordPress). */
     body: text("body").notNull().default(""),
+    /** Page sections, top to bottom: [{ id, type, hidden?, name?, data }] (see src/sections). */
+    layout: jsonb("layout").$type<unknown[]>().notNull().default([]),
     featuredMediaId: uuid("featured_media_id").references(() => media.id, { onDelete: "set null" }),
     status: contentStatusEnum("status").notNull().default("draft"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    /** Optional end date: the item stops being live after this time. */
+    unpublishAt: timestamp("unpublish_at", { withTimezone: true }),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
     /** e.g. "max-image-preview:large" or "noindex, nofollow". */
     robots: text("robots"),
     canonicalUrl: text("canonical_url"),
     ogImageMediaId: uuid("og_image_media_id").references(() => media.id, { onDelete: "set null" }),
+    /** Title and description used when the link is shared (WhatsApp, Telegram, social); fall back to the SEO ones. */
+    ogTitle: text("og_title"),
+    ogDescription: text("og_description"),
+    focusKeyword: text("focus_keyword"),
+    /** Structured-data type for the page, e.g. "WebPage", "AboutPage", "ContactPage", "FAQPage". */
+    schemaType: text("schema_type"),
+    /** Answer-engine fields: { answer, takeaways: string[], faqs: [{ q, a }], reviewedAt }. */
+    aeo: jsonb("aeo").$type<Record<string, unknown>>().notNull().default({}),
+    /** Fixed site pages (home, blog, collections): "home", "blog", "collection:<slug>", "accessories". Their URL can't change. */
+    systemKey: text("system_key").unique(),
     tags: text("tags")
       .array()
       .notNull()
@@ -89,6 +127,11 @@ export const content = pgTable(
     authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
     /** Byline shown on the post (imported posts keep their original WordPress author). */
     authorName: text("author_name"),
+    /** Hand-picked related posts (shown first under a post). */
+    relatedIds: uuid("related_ids")
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     legacyWpId: integer("legacy_wp_id"),
     legacyWpType: text("legacy_wp_type"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -128,6 +171,58 @@ export const redirects = pgTable(
   (t) => [uniqueIndex("redirects_from_idx").on(t.fromPath)],
 );
 
+/* ---------- Blog authors (matched to posts by name) ---------- */
+
+export const authors = pgTable("authors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** Same as the byline on posts (content.author_name). */
+  name: text("name").notNull().unique(),
+  slug: text("slug").notNull().unique(),
+  jobTitle: text("job_title").notNull().default(""),
+  bio: text("bio").notNull().default(""),
+  photoMediaId: uuid("photo_media_id").references(() => media.id, { onDelete: "set null" }),
+  /** Profile links (LinkedIn etc.), used as sameAs for Google. */
+  links: text("links")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ---------- Calls to outside services (email, Twenty, Allsy) ---------- */
+
+export const integrationLog = pgTable(
+  "integration_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** "email" | "twenty" | "allsy" | "pagespeed" | "ai" | "indexnow" */
+    service: text("service").notNull(),
+    action: text("action").notNull(),
+    ok: boolean("ok").notNull(),
+    message: text("message").notNull().default(""),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("integration_log_created_idx").on(t.createdAt)],
+);
+
+/* ---------- Pages visitors asked for that don't exist (404 log) ---------- */
+
+export const notFoundLog = pgTable(
+  "not_found_log",
+  {
+    path: text("path").primaryKey(),
+    hits: integer("hits").notNull().default(1),
+    /** Last page that linked here, if the browser said. */
+    referrer: text("referrer"),
+    firstSeen: timestamp("first_seen", { withTimezone: true }).notNull().defaultNow(),
+    lastSeen: timestamp("last_seen", { withTimezone: true }).notNull().defaultNow(),
+    /** Hidden from the list (e.g. bot noise) until it is hit again. */
+    ignored: boolean("ignored").notNull().default(false),
+  },
+  (t) => [index("not_found_last_idx").on(t.lastSeen)],
+);
+
 /* ---------- Activity log ---------- */
 
 export const activity = pgTable(
@@ -143,6 +238,77 @@ export const activity = pgTable(
   },
   (t) => [index("activity_created_idx").on(t.createdAt)],
 );
+
+/* ---------- Version history (a copy of the item on every save) ---------- */
+
+export const contentRevisions = pgTable(
+  "content_revisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    contentId: uuid("content_id")
+      .notNull()
+      .references(() => content.id, { onDelete: "cascade" }),
+    /** Every editable field of the item as it was saved. */
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull(),
+    title: text("title").notNull(),
+    status: text("status").notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("content_revisions_item_idx").on(t.contentId, t.createdAt)],
+);
+
+/* ---------- Reusable sections (saved once, placed on many pages) ---------- */
+
+export const reusableSections = pgTable("reusable_sections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  /** One section: { type, data }. */
+  section: jsonb("section").$type<{ type: string; data: Record<string, unknown> }>().notNull(),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ---------- Previews (unsaved changes or old versions shown on the real site layout) ---------- */
+
+export const previews = pgTable(
+  "previews",
+  {
+    /** Random token: the preview address is /preview/<id>/. */
+    id: text("id").primaryKey(),
+    contentId: uuid("content_id").references(() => content.id, { onDelete: "cascade" }),
+    /** The item as it would look: same fields as a version snapshot, plus type. */
+    data: jsonb("data").$type<Record<string, unknown>>().notNull(),
+    /** Shared previews open without signing in (until they expire). */
+    shared: boolean("shared").notNull().default(false),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("previews_expires_idx").on(t.expiresAt)],
+);
+
+/* ---------- Who has a page open in the editor (for the "also editing" warning) ---------- */
+
+export const editingPresence = pgTable(
+  "editing_presence",
+  {
+    contentId: uuid("content_id")
+      .notNull()
+      .references(() => content.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastSeen: timestamp("last_seen", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.contentId, t.userId] })],
+);
+
+export type ContentRevision = typeof contentRevisions.$inferSelect;
+export type ReusableSection = typeof reusableSections.$inferSelect;
 
 export type User = typeof users.$inferSelect;
 export type Content = typeof content.$inferSelect;
@@ -189,8 +355,28 @@ export const productOverrides = pgTable("product_overrides", {
   useExternalImages: boolean("use_external_images").notNull().default(true),
   seoTitle: text("seo_title"),
   seoDescription: text("seo_description"),
+  /** Shown when the product link is shared (WhatsApp, Telegram, social). */
+  ogTitle: text("og_title"),
+  ogDescription: text("og_description"),
+  ogImageMediaId: uuid("og_image_media_id").references(() => media.id, { onDelete: "set null" }),
+  /** Labels on the card and page: "new", "bestseller", "limited", "eco". */
+  badges: text("badges")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  /** Hand-picked related products and accessories (Twenty ids), shown first on the product page. */
+  relatedIds: uuid("related_ids")
+    .array()
+    .notNull()
+    .default(sql`'{}'::uuid[]`),
   updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** When each Twenty product was first seen by the website (for the "new in Twenty" notice). */
+export const productSeen = pgTable("product_seen", {
+  twentyId: uuid("twenty_id").primaryKey(),
+  firstSeen: timestamp("first_seen", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type ProductOverride = typeof productOverrides.$inferSelect;

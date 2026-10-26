@@ -10,7 +10,7 @@ import { pushLead, retryPendingLeads } from "@/server/twenty-leads";
 const STATUSES = ["new", "contacted", "converted", "closed", "cancelled", "spam"] as const;
 
 export async function updateLead(form: FormData) {
-  const user = await requireUser();
+  const user = await requireUser("leads");
   const id = z.uuid().parse(form.get("id"));
   const status = form.get("status");
   const assignedTo = form.get("assignedTo");
@@ -29,7 +29,7 @@ export async function updateLead(form: FormData) {
 }
 
 export async function addLeadNote(form: FormData) {
-  const user = await requireUser();
+  const user = await requireUser("leads");
   const id = z.uuid().parse(form.get("id"));
   const body = z.string().trim().min(1).max(4000).safeParse(form.get("body"));
   if (!body.success) return;
@@ -40,7 +40,7 @@ export async function addLeadNote(form: FormData) {
 
 /** Sends one lead (or all waiting leads) to Twenty now. */
 export async function retryTwenty(form: FormData) {
-  const user = await requireUser();
+  const user = await requireUser("leads");
   const id = form.get("id");
   if (typeof id === "string" && id) {
     await pushLead(z.uuid().parse(id));

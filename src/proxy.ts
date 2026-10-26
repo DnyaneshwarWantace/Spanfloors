@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const SESSION_COOKIE = "sf_session";
 const MAIN_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.spanfloors.com").replace(/\/$/, "");
+/** Same rule as src/server/metadata.ts: only the live domain may be indexed. */
+const NOINDEX =
+  process.env.NEXT_PUBLIC_NOINDEX === "true" || (process.env.NEXT_PUBLIC_NOINDEX !== "false" && !/(^|\.)spanfloors\.com$/.test(new URL(MAIN_ORIGIN).hostname));
 
 /** Old blog category slugs → the tag name the posts carry on the new site. */
 const BLOG_CATEGORIES: Record<string, string> = {
@@ -25,12 +28,18 @@ export function proxy(req: NextRequest) {
   // Old blog subdomain → same post on the main site (301 keeps search rankings).
   // blog.spanfloors.com/<slug>/ → www.spanfloors.com/blog/<slug>/ ; category/tag/author/page archives → /blog/
   if (host.startsWith("blog.")) {
+    const img = pathname.match(/^\/wp-content\/uploads\/(.+?)\/?$/);
+    if (img) return NextResponse.redirect(`${MAIN_ORIGIN}/media/blog/${img[1]}`, 301);
     const cat = pathname.match(/^\/category\/([^/]+)/)?.[1];
     if (cat && BLOG_CATEGORIES[cat]) return NextResponse.redirect(`${MAIN_ORIGIN}/blog/?tag=${encodeURIComponent(BLOG_CATEGORIES[cat])}`, 301);
     const archive = /^\/(category|tag|author|page|feed|wp-content|wp-json|wp-admin)\b/.test(pathname);
     const target = archive || pathname === "/" ? "/blog/" : `/blog${pathname.endsWith("/") ? pathname : `${pathname}/`}`;
     return NextResponse.redirect(`${MAIN_ORIGIN}${target}`, 301);
   }
+
+  // Old WordPress image and file addresses (indexed by Google Images) → the same file on this site.
+  const wp = pathname.match(/^\/wp-content\/uploads\/(.+?)\/?$/);
+  if (wp) return NextResponse.redirect(new URL(`/media/wp/${wp[1]}`, req.url), 301);
 
   // Admin: no session cookie → sign-in page. The session itself is verified in the admin layout.
   if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
@@ -41,7 +50,9 @@ export function proxy(req: NextRequest) {
       return NextResponse.redirect(url);
     }
   }
-  return NextResponse.next();
+  const res = NextResponse.next();
+  if (NOINDEX) res.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return res;
 }
 
 // Everything except static assets.

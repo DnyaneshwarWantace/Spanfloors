@@ -6,7 +6,7 @@ import { settingsForAdmin } from "@/server/settings";
 export const dynamic = "force-dynamic";
 
 export default async function IntegrationsPage() {
-  await requireUser("admin");
+  await requireUser("settings.integrations");
   const rows = (await settingsForAdmin()).filter((r) => r.group === "integrations");
   return (
     <>
@@ -37,7 +37,6 @@ export default async function IntegrationsPage() {
               "Mode “allsy” (default) uses the synced Allsy.io media above. Other modes for a different image host. Mode “template”: public links like https://images.example.com/{id}.jpg. Mode “api”: a private API; the website fetches each image with the key on the server, caches it and serves it, so the key is never exposed. Use the Test button on any product to check an ID.",
             keys: ["images.mode", "images.urlTemplate", "images.apiUrl", "images.apiKey", "images.apiKeyHeader", "images.apiKeyPrefix", "images.jsonPath"],
           },
-          { title: "Analytics", keys: ["analytics.gaId", "analytics.gtmId"] },
           { title: "Email (enquiry & sample forms)", keys: ["email.enquiryTo", "email.smtpHost", "email.smtpUser", "email.smtpPassword"] },
         ]}
       />

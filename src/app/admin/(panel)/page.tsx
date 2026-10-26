@@ -3,6 +3,7 @@ import { count, desc, eq, and, gte, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/server/auth";
 import { btn, Card, formatDate, PageHeader } from "@/components/admin/ui";
+import { can } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       .limit(8),
   ]);
 
+  const seeLeads = can(user.role, "leads");
+  const seeContent = can(user.role, "content");
+  const seeAll = can(user.role, "content.all");
   const startOfDay = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) + "T00:00:00+05:30");
   const [[{ n: leadsToday }], [{ n: leadsNew }], [{ n: notInTwenty }]] = await Promise.all([
     db.select({ n: count() }).from(schema.leads).where(gte(schema.leads.createdAt, startOfDay)),
@@ -45,11 +49,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   ]);
 
   const stats = [
-    { label: "Form leads today", value: leadsToday, note: `${leadsNew} new in total`, href: "/admin/leads/?status=new" },
-    { label: "Blog posts", value: postsLive, note: `${postsDraft} drafts`, href: "/admin/content/?type=post" },
-    { label: "Pages", value: pagesLive, note: `${pagesDraft} drafts`, href: "/admin/content/?type=page" },
-    { label: "Media files", value: mediaCount, href: "/admin/media/" },
-  ];
+    seeLeads && { label: "Form leads today", value: leadsToday, note: `${leadsNew} new in total`, href: "/admin/leads/?status=new" },
+    seeContent && { label: "Blog posts", value: postsLive, note: `${postsDraft} drafts`, href: "/admin/content/?type=post" },
+    seeAll && { label: "Pages", value: pagesLive, note: `${pagesDraft} drafts`, href: "/admin/content/?type=page" },
+    can(user.role, "media") && { label: "Media files", value: mediaCount, href: "/admin/media/" },
+  ].filter((x): x is { label: string; value: number; note?: string; href: string } => Boolean(x));
 
   return (
     <>
@@ -57,20 +61,24 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         title={`Welcome, ${user.name.split(" ")[0]}`}
         description="Manage the Span Floors website."
         actions={
-          <>
-            <Link href="/admin/content/new/?type=post" className={btn.primary}>
-              New blog post
-            </Link>
-            <Link href="/admin/content/new/?type=page" className={btn.secondary}>
-              New page
-            </Link>
-          </>
+          seeContent && (
+            <>
+              <Link href="/admin/content/new/?type=post" className={btn.primary}>
+                New blog post
+              </Link>
+              {seeAll && (
+                <Link href="/admin/content/new/?type=page" className={btn.secondary}>
+                  New page
+                </Link>
+              )}
+            </>
+          )
         }
       />
 
-      {denied && <p className="mb-6 border border-brand/40 bg-brand/5 px-4 py-3 text-2xs">That section needs an admin account.</p>}
+      {denied && <p className="mb-6 border border-brand/40 bg-brand/5 px-4 py-3 text-2xs">Your account doesn’t have access to that section. Ask an admin if you need it.</p>}
 
-      {notInTwenty > 0 && (
+      {seeLeads && notInTwenty > 0 && (
         <Link href="/admin/leads/" className="mb-6 block border border-[#a0661f]/40 bg-[#a0661f]/8 px-4 py-3 text-2xs">
           <strong className="font-medium">{notInTwenty} lead{notInTwenty === 1 ? "" : "s"} not in Twenty yet</strong> — saved here and retrying automatically. View leads →
         </Link>
@@ -86,6 +94,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         ))}
       </div>
 
+      {seeAll && (
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
         <Card title="Recently edited">
           <ul className="divide-y divide-line">
@@ -120,6 +129,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           )}
         </Card>
       </div>
+      )}
     </>
   );
 }

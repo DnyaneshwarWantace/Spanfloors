@@ -9,7 +9,7 @@ export type SettingsState = { ok?: boolean; error?: string; tested?: string };
 /** Saves one settings group. Secret fields left blank keep their current value; "clear" removes them. */
 export async function saveSettingsGroup(_prev: SettingsState, form: FormData): Promise<SettingsState> {
   const group = String(form.get("_group") ?? "");
-  const user = await requireUser(group === "integrations" ? "admin" : "editor");
+  const user = await requireUser(group === "integrations" ? "settings.integrations" : group === "forms" ? "settings.forms" : "settings.site");
   const values: Partial<Record<SettingKey, string>> = {};
   for (const [key, def] of Object.entries(SETTING_DEFS) as [SettingKey, (typeof SETTING_DEFS)[SettingKey]][]) {
     if (def.group !== group && !(group === "site" && def.group === "seo")) continue;
@@ -53,7 +53,7 @@ export async function saveSettingsGroup(_prev: SettingsState, form: FormData): P
 
 /** Read-only connection check: one GET to Twenty with the saved key. */
 export async function testTwentyConnection(): Promise<SettingsState> {
-  await requireUser("admin");
+  await requireUser("settings.integrations");
   const { getSettings } = await import("@/server/settings");
   const cfg = await getSettings(["twenty.apiUrl", "twenty.apiKey"]);
   if (!cfg["twenty.apiKey"]) return { error: "No Twenty API key saved." };

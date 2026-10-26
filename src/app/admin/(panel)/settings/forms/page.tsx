@@ -6,7 +6,7 @@ import { settingsForAdmin } from "@/server/settings";
 export const dynamic = "force-dynamic";
 
 export default async function FormsSettingsPage() {
-  await requireUser();
+  await requireUser("settings.forms");
   const rows = (await settingsForAdmin()).filter((r) => r.group === "forms");
   return (
     <>

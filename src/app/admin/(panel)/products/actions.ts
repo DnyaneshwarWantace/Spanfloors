@@ -22,11 +22,16 @@ const schemaIn = z.object({
   useExternalImages: z.boolean(),
   seoTitle: z.string().max(120),
   seoDescription: z.string().max(320),
+  ogTitle: z.string().max(120),
+  ogDescription: z.string().max(300),
+  ogImageMediaId: z.uuid().or(z.literal("")),
+  badges: z.array(z.enum(["new", "bestseller", "limited", "eco"])).max(4),
+  relatedIds: z.array(z.uuid()).max(12),
 });
 
 /** Saves admin extras for a Twenty product. Writes only to our own database — never to Twenty. */
 export async function saveProductExtras(_prev: ProductSaveState, form: FormData): Promise<ProductSaveState> {
-  const user = await requireUser();
+  const user = await requireUser("products");
   const parsed = schemaIn.safeParse({
     twentyId: form.get("twentyId"),
     hidden: form.get("hidden") === "on",
@@ -45,6 +50,11 @@ export async function saveProductExtras(_prev: ProductSaveState, form: FormData)
     useExternalImages: form.get("useExternalImages") === "on",
     seoTitle: String(form.get("seoTitle") ?? "").trim(),
     seoDescription: String(form.get("seoDescription") ?? "").trim(),
+    ogTitle: String(form.get("ogTitle") ?? "").trim(),
+    ogDescription: String(form.get("ogDescription") ?? "").trim(),
+    ogImageMediaId: String(form.get("ogImageMediaId") ?? "").trim(),
+    badges: form.getAll("badges").map(String),
+    relatedIds: String(form.get("relatedIds") ?? "").split(",").filter(Boolean),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the fields and try again." };
   const v = parsed.data;
@@ -63,6 +73,11 @@ export async function saveProductExtras(_prev: ProductSaveState, form: FormData)
     useExternalImages: v.useExternalImages,
     seoTitle: v.seoTitle || null,
     seoDescription: v.seoDescription || null,
+    ogTitle: v.ogTitle || null,
+    ogDescription: v.ogDescription || null,
+    ogImageMediaId: v.ogImageMediaId || null,
+    badges: [...new Set(v.badges)],
+    relatedIds: [...new Set(v.relatedIds)].filter((id) => id !== v.twentyId),
     updatedBy: user.id,
     updatedAt: new Date(),
   };
@@ -78,7 +93,7 @@ export async function saveProductExtras(_prev: ProductSaveState, form: FormData)
 }
 
 export async function testExternalImage(id: string) {
-  await requireUser();
+  await requireUser("products");
   return testImageId(id.trim());
 }
 
@@ -86,7 +101,7 @@ const arrangeSchema = z.array(z.object({ id: z.uuid(), hidden: z.boolean(), feat
 
 /** Saves the order (positions 1…n) and hide/featured flags for one category. Our database only — never Twenty. */
 export async function saveArrangement(items: unknown, categoryTitle: string): Promise<{ ok: boolean; error?: string }> {
-  const user = await requireUser();
+  const user = await requireUser("products");
   const parsed = arrangeSchema.safeParse(items);
   if (!parsed.success) return { ok: false, error: "Invalid order" };
   for (const [i, it] of parsed.data.entries()) {

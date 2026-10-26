@@ -48,6 +48,8 @@ docker compose -f docker-compose.prod.yml exec app sh -c \
 
 Media files in `storage/uploads/` come with the git repository for now (later: S3/R2).
 
+To refresh the seed from a local database before pushing: `bash scripts/make-seed.sh`.
+
 ## 6. Updating
 
 ```bash

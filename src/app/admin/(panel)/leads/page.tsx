@@ -15,7 +15,7 @@ const PER_PAGE = 40;
 const STATUS_TONE: Record<string, string> = { new: "scheduled", contacted: "draft", converted: "published", closed: "archived", cancelled: "archived", spam: "archived" };
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const me = await requireUser();
+  const me = await requireUser("leads");
   const sp = await searchParams;
   const filters = { ...sp, assigned: sp.assigned === "me" ? me.id : sp.assigned };
   const page = Math.max(Number(sp.page) || 1, 1);

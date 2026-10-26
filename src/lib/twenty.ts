@@ -21,7 +21,17 @@ async function twentyGet<T>(path: string): Promise<T> {
     next: { revalidate: Number(cfg["twenty.refreshSeconds"] ?? 300), tags: ["twenty"] },
   });
   if (!res.ok) throw new Error(`Twenty GET ${path} failed: ${res.status}`);
+  // Cached responses keep Twenty's own Date header: that is when the data was actually read.
+  const when = Date.parse(res.headers.get("date") ?? "");
+  if (when) lastRead = Math.min(lastRead ?? Infinity, when);
   return res.json() as Promise<T>;
+}
+
+let lastRead: number | null = null;
+
+/** When the product data now shown was read from Twenty (null if not read yet in this process). */
+export function twentyReadAt(): Date | null {
+  return lastRead ? new Date(lastRead) : null;
 }
 
 type Currency = { amountMicros: number | null; currencyCode: string | null } | null;
@@ -154,6 +164,7 @@ function toPublic(p: RawMasterProduct): TwentyProduct {
 
 /** All master products from Twenty (paged GET requests), mapped to the public shape. */
 export async function fetchAllProducts(): Promise<TwentyProduct[]> {
+  lastRead = null;
   const all: TwentyProduct[] = [];
   let cursor: string | null | undefined = null;
   for (let i = 0; i < 50; i++) {

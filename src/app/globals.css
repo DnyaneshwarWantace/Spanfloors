@@ -289,6 +289,9 @@
   .cms-body > :first-child {
     margin-top: 0;
   }
+  .cms-body :is(h2, h3) {
+    scroll-margin-top: 6rem;
+  }
   .cms-body h2 {
     font-family: var(--font-mono);
     text-transform: uppercase;

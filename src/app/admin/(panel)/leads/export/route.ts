@@ -1,4 +1,5 @@
 import { currentUser } from "@/server/auth";
+import { can } from "@/lib/permissions";
 import { LEAD_LABELS, type LeadType } from "@/server/forms";
 import { leadRows, leadWhere } from "../query";
 
@@ -6,6 +7,7 @@ import { leadRows, leadWhere } from "../query";
 export async function GET(req: Request) {
   const user = await currentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
+  if (!can(user.role, "leads")) return new Response("Forbidden", { status: 403 });
   const sp = Object.fromEntries(new URL(req.url).searchParams);
   const rows = await leadRows(leadWhere({ ...sp, assigned: sp.assigned === "me" ? user.id : sp.assigned }), 20000);
 

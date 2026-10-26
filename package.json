@@ -16,9 +16,13 @@
     "site:start": "docker compose --env-file docker.env up -d db && (lsof -ti tcp:3100 -sTCP:LISTEN >/dev/null && echo Already running at http://localhost:3100 || (screen -dmS spanfloors bash -c \"npx next start -p 3100 >> storage/server.log 2>&1\" && echo Site running at http://localhost:3100))",
     "site:stop": "screen -S spanfloors -X quit 2>/dev/null; lsof -ti tcp:3100 -sTCP:LISTEN | xargs kill 2>/dev/null; echo stopped",
     "site:restart": "npm run site:stop && npm run build && npm run site:start",
+    "media:fetch-used": "tsx --conditions=react-server --env-file=.env.local scripts/fetch-page-media.ts",
+    "media:backfill": "tsx --conditions=react-server --env-file=.env.local scripts/media-backfill.ts",
+    "content:fix-links": "tsx --conditions=react-server --env-file=.env.local scripts/fix-links.ts",
     "content:fix-images": "tsx --conditions=react-server --env-file=.env.local scripts/fix-resized-images.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "@tiptap/extension-image": "^3.32.0",
     "@tiptap/extension-placeholder": "^3.32.0",
     "@tiptap/pm": "^3.32.0",
@@ -35,6 +39,7 @@
     "react-dom": "^19.3.0",
     "sanitize-html": "^2.18.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
     "swiper": "^14.3.0",
     "zod": "^4.6.7"
   },

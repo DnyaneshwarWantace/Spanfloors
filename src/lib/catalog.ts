@@ -8,56 +8,12 @@ import { externalImageUrl, imageConfig } from "@/server/product-images";
 import { allsyImageIndex } from "@/server/allsy";
 import { mediaUrl } from "@/server/storage";
 import { inArray } from "drizzle-orm";
+import { sized } from "./img";
+import { badgeLabel } from "./badges";
 
-export type CategoryKey = "engineered" | "laminate" | "composite" | "decking" | "facades" | "accessories";
+import { CATEGORIES, type Category, type CategoryKey } from "./categories";
 
-export type Category = {
-  key: CategoryKey;
-  /** URL segment — matches the existing spanfloors.com URLs where one exists, to keep SEO. */
-  slug: string;
-  title: string;
-  intro: string;
-};
-
-export const CATEGORIES: Category[] = [
-  {
-    key: "engineered",
-    slug: "engineered-wood-flooring-collection",
-    title: "Engineered Wood Flooring",
-    intro:
-      "Real timber wear layers over a stable multi-layer core. Planks, herringbone and chevron in European oak, walnut and teak, finished and ready to lay.",
-  },
-  {
-    key: "laminate",
-    slug: "laminate-flooring-collection",
-    title: "Laminate Flooring",
-    intro: "Hard-wearing laminate with authentic wood visuals, built for busy homes and easy upkeep.",
-  },
-  {
-    key: "composite",
-    slug: "composite-flooring-collection",
-    title: "Composite Flooring",
-    intro: "Composite floors that pair the look of wood with resistance to moisture and daily wear.",
-  },
-  {
-    key: "decking",
-    slug: "decking-collection",
-    title: "Decking",
-    intro: "Exterior timber and composite decking for terraces, pool surrounds and gardens.",
-  },
-  {
-    key: "facades",
-    slug: "facades-collection",
-    title: "Facades",
-    intro: "Timber cladding, fluted profiles and screening for exteriors that age beautifully.",
-  },
-  {
-    key: "accessories",
-    slug: "accessories",
-    title: "Accessories",
-    intro: "Skirting, profiles, underlays, adhesives and care products to finish every installation.",
-  },
-];
+export { CATEGORIES, type Category, type CategoryKey };
 
 const FACADE_WORDS = /(cladding|fluted|screen|louv|facade|façade|batten)/i;
 
@@ -131,6 +87,12 @@ export type CatalogProduct = TwentyProduct & {
   descriptionHtml: string;
   seoTitle: string | null;
   seoDescription: string | null;
+  ogTitle: string | null;
+  ogDescription: string | null;
+  /** Share image chosen in the admin (/media/… address). */
+  ogImage: string | null;
+  badges: string[];
+  relatedIds: string[];
 };
 
 async function loadOverrides(): Promise<Map<string, ProductOverride>> {
@@ -139,7 +101,7 @@ async function loadOverrides(): Promise<Map<string, ProductOverride>> {
 }
 
 async function galleryUrls(overrides: Map<string, ProductOverride>): Promise<Map<string, string>> {
-  const ids = [...new Set([...overrides.values()].flatMap((o) => o.mediaIds))];
+  const ids = [...new Set([...overrides.values()].flatMap((o) => [...o.mediaIds, ...(o.ogImageMediaId ? [o.ogImageMediaId] : [])]))];
   if (!ids.length) return new Map();
   const rows = await db.select({ id: schema.media.id, path: schema.media.path }).from(schema.media).where(inArray(schema.media.id, ids));
   return new Map(rows.map((r) => [r.id, mediaUrl(r.path)]));
@@ -197,6 +159,11 @@ export const getFullCatalog = cache(async (): Promise<CatalogProduct[]> => {
       descriptionHtml: o?.descriptionHtml ?? "",
       seoTitle: o?.seoTitle ?? null,
       seoDescription: o?.seoDescription ?? null,
+      ogTitle: o?.ogTitle ?? null,
+      ogDescription: o?.ogDescription ?? null,
+      ogImage: o?.ogImageMediaId ? (gallery.get(o.ogImageMediaId) ?? null) : null,
+      badges: o?.badges ?? [],
+      relatedIds: o?.relatedIds ?? [],
     });
   }
   // Order set in Admin → Products → Arrange (positions 1…n); unarranged products follow, featured first, then A–Z.
@@ -252,7 +219,9 @@ export function toCard(p: CatalogProduct) {
     href: p.href,
     name: displayName(p),
     subtitle: subtitleOf(p),
-    image: productImages(p)[0] ?? null,
+    // Cards use a smaller copy of uploaded photos (external image hosts serve their own sizes).
+    image: productImages(p)[0] ? sized(productImages(p)[0], 960) : null,
+    badge: p.badges.map(badgeLabel).find(Boolean) ?? null,
     tone: p.collection,
   };
 }

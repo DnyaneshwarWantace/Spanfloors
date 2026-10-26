@@ -22,17 +22,20 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
 }
 
 export default async function ProductEditor({ params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  await requireUser("products");
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const p = (await getAdminProducts()).find((x) => x.id === id);
+  const all = await getAdminProducts();
+  const p = all.find((x) => x.id === id);
   if (!p) notFound();
+  const productOptions = all.filter((x) => x.live).map((x) => ({ id: x.id, name: x.displayName, collection: x.categoryTitle ?? "" }));
 
   const [o] = await db.select().from(schema.productOverrides).where(eq(schema.productOverrides.twentyId, id));
   const galleryRows = o?.mediaIds.length
     ? await db.select({ id: schema.media.id, path: schema.media.path, alt: schema.media.alt }).from(schema.media).where(inArray(schema.media.id, o.mediaIds))
     : [];
   const byId = new Map(galleryRows.map((r) => [r.id, r]));
+  const [shareRow] = o?.ogImageMediaId ? await db.select({ id: schema.media.id, path: schema.media.path }).from(schema.media).where(eq(schema.media.id, o.ogImageMediaId)) : [];
   const gallery = (o?.mediaIds ?? []).map((m) => byId.get(m)).filter((r): r is NonNullable<typeof r> => Boolean(r)).map((r) => ({ id: r.id, url: mediaUrl(r.path), alt: r.alt }));
 
   return (
@@ -89,6 +92,7 @@ export default async function ProductEditor({ params }: { params: Promise<{ id: 
         <ProductExtrasForm
           defaultName={p.name}
           twentyImageId={p.imageId}
+          productOptions={productOptions}
           initial={{
             twentyId: p.id,
             hidden: o?.hidden ?? false,
@@ -102,6 +106,11 @@ export default async function ProductEditor({ params }: { params: Promise<{ id: 
             useExternalImages: o?.useExternalImages ?? true,
             seoTitle: o?.seoTitle ?? "",
             seoDescription: o?.seoDescription ?? "",
+            ogTitle: o?.ogTitle ?? "",
+            ogDescription: o?.ogDescription ?? "",
+            ogImage: shareRow ? { id: shareRow.id, url: mediaUrl(shareRow.path) } : null,
+            badges: o?.badges ?? [],
+            relatedIds: o?.relatedIds ?? [],
           }}
         />
       </div>

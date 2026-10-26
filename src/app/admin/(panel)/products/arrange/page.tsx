@@ -7,7 +7,7 @@ import { CATEGORIES, displayName, getFullCatalog, subtitleOf, type CategoryKey }
 export const dynamic = "force-dynamic";
 
 export default async function ArrangePage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
-  await requireUser();
+  await requireUser("products");
   const sp = await searchParams;
   const catalog = await getFullCatalog().catch(() => []);
   const available = CATEGORIES.filter((c) => catalog.some((p) => p.categoryKey === c.key));

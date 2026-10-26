@@ -55,8 +55,8 @@ export default function SettingsForm({ group, rows, sections, showTwentyTest = f
                         </label>
                       )}
                     </>
-                  ) : r.value.trim().startsWith("{") || key.endsWith(".config") || key.endsWith(".recipients") ? (
-                    <textarea id={key} name={key} defaultValue={r.value.startsWith("{") ? JSON.stringify(JSON.parse(r.value), null, 2) : r.value} rows={8} spellCheck={false} className={`${inputCls} h-auto py-2 font-mono text-2xs`} />
+                  ) : r.value.trim().startsWith("{") || key.endsWith(".config") || key.endsWith(".recipients") || key === "seo.aiFacts" || key === "seo.aiSummary" || key === "seo.defaultDescription" ? (
+                    <textarea id={key} name={key} defaultValue={r.value.startsWith("{") ? JSON.stringify(JSON.parse(r.value), null, 2) : r.value} rows={r.value.startsWith("{") ? 8 : 3} spellCheck={!r.value.startsWith("{")} className={`${inputCls} h-auto py-2 ${r.value.startsWith("{") ? "font-mono text-2xs" : ""}`} />
                   ) : (
                     <input id={key} name={key} defaultValue={r.value} className={inputCls} />
                   )}

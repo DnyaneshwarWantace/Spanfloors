@@ -33,8 +33,6 @@ export const SETTING_DEFS = {
   "allsy.apiUrl": { group: "integrations", label: "Allsy.io API base URL (e.g. https://api.allsy.io/v1)", secret: false },
   "allsy.apiKey": { group: "integrations", label: "Allsy.io API key (for pulling media)", secret: true },
   "allsy.webhookSecret": { group: "integrations", label: "Allsy.io push secret (shared with Allsy.io to sign pushes)", secret: true },
-  "analytics.gaId": { group: "integrations", label: "Google Analytics measurement ID", secret: false },
-  "analytics.gtmId": { group: "integrations", label: "Google Tag Manager ID", secret: false },
   "email.smtpHost": { group: "integrations", label: "SMTP host (enquiry emails)", secret: false },
   "email.smtpUser": { group: "integrations", label: "SMTP username", secret: false },
   "email.smtpPassword": { group: "integrations", label: "SMTP password", secret: true },
@@ -45,6 +43,10 @@ export const SETTING_DEFS = {
   "email.fromName": { group: "integrations", label: "Send emails from (name)", secret: false, default: "Span Floors" },
   "turnstile.siteKey": { group: "integrations", label: "Cloudflare Turnstile site key (optional spam check)", secret: false },
   "turnstile.secret": { group: "integrations", label: "Cloudflare Turnstile secret key", secret: true },
+  "seo.pagespeedKey": { group: "integrations", label: "Google PageSpeed Insights API key (optional, for the SEO check button)", secret: true },
+  "ai.provider": { group: "integrations", label: "AI for writing SEO titles and descriptions: anthropic or none", secret: false, default: "none" },
+  "ai.apiKey": { group: "integrations", label: "AI API key", secret: true },
+  "ai.model": { group: "integrations", label: "AI model (leave empty for claude-opus-5)", secret: false },
 
   // Forms & bookings
   "forms.recipients": {
@@ -72,14 +74,12 @@ export const SETTING_DEFS = {
 
   // Site settings
   "site.name": { group: "site", label: "Site name", secret: false, default: "Span Floors" },
-  "site.phone": { group: "site", label: "Phone", secret: false, default: "+91 92120 96387" },
-  "site.email": { group: "site", label: "Email", secret: false },
-  "site.address": { group: "site", label: "Experience centre address", secret: false },
-  "site.instagram": { group: "site", label: "Instagram URL", secret: false, default: "https://www.instagram.com/spanfloors/" },
-  "site.facebook": { group: "site", label: "Facebook URL", secret: false, default: "https://www.facebook.com/spanfloors/" },
-  "site.linkedin": { group: "site", label: "LinkedIn URL", secret: false, default: "https://www.linkedin.com/company/span-floors-llp" },
   "seo.defaultTitle": { group: "seo", label: "Default SEO title", secret: false },
   "seo.defaultDescription": { group: "seo", label: "Default meta description", secret: false },
+  "seo.aiSummary": { group: "seo", label: "Summary for AI search (llms.txt): two or three sentences about Span Floors", secret: false },
+  "seo.aiFacts": { group: "seo", label: "Key facts for AI search, one per line", secret: false },
+  "products.reviewedAt": { group: "products", label: "Products last marked as seen (new-in-Twenty notice)", secret: false },
+  "seo.indexnowKey": { group: "seo", label: "IndexNow key (created automatically)", secret: false },
 } as const satisfies Record<string, { group: string; label: string; secret: boolean; env?: string; default?: string }>;
 
 export type SettingKey = keyof typeof SETTING_DEFS;

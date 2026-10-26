@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Listing, { type ListingItem } from "@/components/Listing";
 import { formatOf, getCatalog, getCategory, label, toCard, type CatalogProduct, type CategoryKey } from "@/lib/catalog";
-import { breadcrumbLd, JsonLd, legacyFor, pageMetadata, SITE_URL } from "@/lib/seo";
+import { breadcrumbLd, JsonLd, legacyFor, SITE_URL } from "@/lib/seo";
+import { getSystemPage, type SystemKey } from "@/server/content";
+import { systemMetadata } from "@/server/system-seo";
+import RenderSections from "@/sections/RenderSections";
 
 const FACETS = [
   { key: "category", label: "Category" },
@@ -13,15 +16,18 @@ const FACETS = [
   { key: "brand", label: "Brands" },
 ];
 
-export function categoryMetadata(key: CategoryKey): Metadata {
+const systemKeyOf = (c: { key: CategoryKey; slug: string } | null): SystemKey => (!c ? "home" : c.key === "accessories" ? "accessories" : `collection:${c.slug}`);
+
+export function categoryMetadata(key: CategoryKey): Promise<Metadata> {
   const c = getCategory(key);
-  return pageMetadata(`/${c.slug}/`, { title: `${c.title} | Span Floors`, description: c.intro });
+  return systemMetadata(systemKeyOf(c), `/${c.slug}/`, { title: `${c.title} | Span Floors`, description: c.intro });
 }
 
 /** Product listing for one category, or the whole catalogue when no category is given. */
 export default async function CategoryView({ categoryKey }: { categoryKey?: CategoryKey }) {
   const c = categoryKey ? getCategory(categoryKey) : null;
   const path = c ? `/${c.slug}/` : "/";
+  const page = await getSystemPage(systemKeyOf(c));
   let products: CatalogProduct[] = [];
   try {
     const all = await getCatalog();
@@ -47,7 +53,12 @@ export default async function CategoryView({ categoryKey }: { categoryKey?: Cate
   });
 
   const title = c ? (legacyFor(path)?.h1 ?? c.title) : "Wooden Flooring, Decking & Facades";
-  const intro = c?.intro ?? "Engineered wood flooring, decking, facades and accessories from Span Floors.";
+  const intro = page?.excerpt?.trim() || (c?.intro ?? "Engineered wood flooring, decking, facades and accessories from Span Floors.");
+  // Sections placed before a "Product list" section show above the products; the rest (or all, without one) below.
+  const layout = (Array.isArray(page?.layout) ? page.layout : []) as { type: string }[];
+  const at = layout.findIndex((s) => s.type === "listing");
+  const above = at >= 0 ? layout.slice(0, at) : [];
+  const below = at >= 0 ? layout.slice(at + 1) : layout;
 
   return (
     <>
@@ -66,6 +77,8 @@ export default async function CategoryView({ categoryKey }: { categoryKey?: Cate
         }}
       />
 
+      {above.length > 0 && <RenderSections layout={above} path={path} />}
+
       <section className="grid grid-cols-12 gap-gap border-b border-line px-gap pt-10 pb-10">
         <h1 className="mono col-span-12 text-title md:col-span-5">{title}</h1>
         <div className="col-span-12 grid gap-3 text-2xs leading-normal md:col-span-4 md:col-start-9">
@@ -75,6 +88,9 @@ export default async function CategoryView({ categoryKey }: { categoryKey?: Cate
       </section>
 
       <Listing items={items} facets={FACETS} labels={labels} />
+
+      {/* Extra sections added to this page in Admin → Site pages */}
+      {below.length > 0 && <RenderSections layout={below} path={path} />}
     </>
   );
 }

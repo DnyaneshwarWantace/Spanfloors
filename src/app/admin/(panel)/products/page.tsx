@@ -1,5 +1,9 @@
 import RefreshButton from "@/components/admin/RefreshButton";
 import { requireUser } from "@/server/auth";
+import { redirect } from "next/navigation";
+import { saveSettings } from "@/server/settings";
+import { twentyReadAt } from "@/lib/twenty";
+import { findDuplicates, newProducts } from "@/server/product-watch";
 import AdminProducts, { type AdminRow } from "@/components/admin/AdminProducts";
 import { CATEGORIES, getAdminProducts, legacyProductMap } from "@/lib/catalog";
 
@@ -49,8 +53,15 @@ function Bars({ rows, total, unit }: { rows: { label: string; value: number }[];
   );
 }
 
+async function markSeen() {
+  "use server";
+  const user = await requireUser("products");
+  await saveSettings({ "products.reviewedAt": new Date().toISOString() }, user.id);
+  redirect("/admin/products/");
+}
+
 export default async function AdminPage() {
-  await requireUser();
+  await requireUser("products");
   let rows: AdminRow[] = [];
   let urls: Awaited<ReturnType<typeof legacyProductMap>> = [];
   let error: string | null = null;
@@ -65,7 +76,9 @@ export default async function AdminPage() {
   const withImage = live.filter((r) => r.images.length).length;
   const sameUrls = urls.filter((u) => u.outcome === "same").length;
   const redirected = urls.length - sameUrls;
-  const now = new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
+  const readAt = twentyReadAt();
+  const now = (readAt ?? new Date()).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
+  const [fresh, dups] = rows.length ? await Promise.all([newProducts(rows), Promise.resolve(findDuplicates(rows))]) : [[], []];
 
   return (
     <div>
@@ -73,7 +86,7 @@ export default async function AdminPage() {
         <div>
           <h1 className="mono text-title">Products from Twenty</h1>
           <p className="mt-1 text-2xs text-muted">
-            Workspace spanfloors.twenty.com · read {now} IST · site refreshes automatically every 5 minutes
+            Workspace spanfloors.twenty.com · data read from Twenty {now} IST · refreshes automatically every 5 minutes
           </p>
         </div>
         <div className="flex gap-2">
@@ -88,6 +101,53 @@ export default async function AdminPage() {
         <div role="alert" className="mb-8 border border-brand/40 bg-brand/5 p-4 text-body">
           <strong className="font-medium">Couldn’t read from Twenty.</strong> {error}
         </div>
+      )}
+
+      {fresh.length > 0 && (
+        <section className="mb-8 border border-[#2f6339]/40 bg-[#3d7a4a]/8 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-body">
+              <b className="font-medium">{fresh.length} new product{fresh.length === 1 ? "" : "s"} from Twenty</b> since you last looked
+            </h2>
+            <form action={markSeen}>
+              <button className="inline-flex h-8 items-center border border-ink px-3 text-2xs hover:bg-ink hover:text-paper">Mark all as seen</button>
+            </form>
+          </div>
+          <ul className="mt-3 grid gap-1 text-2xs sm:grid-cols-2">
+            {fresh.slice(0, 20).map((p) => (
+              <li key={p.id}>
+                <a href={`/admin/products/${p.id}/`} className="underline">
+                  {p.name}
+                </a>
+                {!p.category && <span className="text-muted"> · no category yet (hidden)</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-2xs text-muted">Open each to add photos, badges or a position, or arrange them under Arrange products.</p>
+        </section>
+      )}
+
+      {dups.length > 0 && (
+        <details className="mb-8 border border-[#a0661f]/40 bg-[#a0661f]/8 p-4">
+          <summary className="cursor-pointer text-body">
+            <b className="font-medium">{dups.length} possible duplicate{dups.length === 1 ? "" : "s"} in Twenty</b> <span className="text-2xs text-muted">(fix them in Twenty; the website never changes Twenty)</span>
+          </summary>
+          <ul className="mt-3 grid gap-2 text-2xs">
+            {dups.map((g, i) => (
+              <li key={i}>
+                <span className="text-muted">{g.reason}:</span>{" "}
+                {g.products.map((p, j) => (
+                  <span key={p.id}>
+                    {j > 0 && " · "}
+                    <a href={`/admin/products/${p.id}/`} className="underline">
+                      {p.name}
+                    </a>
+                  </span>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {/* Overview */}

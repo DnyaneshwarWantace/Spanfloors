@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { sized, srcSet } from "@/lib/img";
 import { listPosts } from "@/server/content";
-import { breadcrumbLd, JsonLd, pageMetadata } from "@/lib/seo";
+import { breadcrumbLd, JsonLd } from "@/lib/seo";
+import { getSystemPage } from "@/server/content";
+import { systemMetadata } from "@/server/system-seo";
+import RenderSections from "@/sections/RenderSections";
 
 export const revalidate = 60;
 
-export const metadata: Metadata = pageMetadata("/blog/", {
-  title: "Blog | Wood Flooring Guides & News | Span Floors",
-  description: "Guides, care advice and news on engineered wood flooring, laminate, decking and facades from Span Floors.",
-});
+export const generateMetadata = (): Promise<Metadata> =>
+  systemMetadata("blog", "/blog/", {
+    title: "Blog | Wood Flooring Guides & News | Span Floors",
+    description: "Guides, care advice and news on engineered wood flooring, laminate, decking and facades from Span Floors.",
+  });
 
 const PER_PAGE = 12;
 const fmt = (d: Date | null) => (d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "");
@@ -17,7 +22,7 @@ export default async function BlogIndex({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const page = Math.max(Number(sp.page) || 1, 1);
   const tag = sp.tag?.trim() || undefined;
-  const { posts, total } = await listPosts({ limit: PER_PAGE, offset: (page - 1) * PER_PAGE, tag });
+  const [{ posts, total }, system] = await Promise.all([listPosts({ limit: PER_PAGE, offset: (page - 1) * PER_PAGE, tag }), getSystemPage("blog")]);
   const pages = Math.max(Math.ceil(total / PER_PAGE), 1);
   const [lead, ...rest] = posts;
 
@@ -47,7 +52,7 @@ export default async function BlogIndex({ searchParams }: { searchParams: Promis
             <Link href={lead.path} className="group mb-14 grid gap-gap border-b border-line pb-14 md:grid-cols-12">
               <div className="relative aspect-[16/10] overflow-hidden bg-paper-2 md:col-span-7">
                 {lead.featured ? (
-                  <img src={lead.featured.url} alt={lead.featured.alt} className="absolute inset-0 size-full object-cover transition-transform duration-[1200ms] ease-butter group-hover:scale-[1.03]" />
+                  <img src={sized(lead.featured.url, 960)} srcSet={srcSet(lead.featured.url)} sizes="(min-width: 768px) 50vw, 100vw" alt={lead.featured.alt} className="absolute inset-0 size-full object-cover transition-transform duration-[1200ms] ease-butter group-hover:scale-[1.03]" />
                 ) : (
                   <div className="wood" style={{ ["--tone" as string]: "#6f5a44", ["--boards" as string]: 4 }} />
                 )}
@@ -66,7 +71,7 @@ export default async function BlogIndex({ searchParams }: { searchParams: Promis
               <Link key={p.id} href={p.path} className="group">
                 <div className="relative aspect-[5/6] overflow-hidden bg-paper-2">
                   {p.featured ? (
-                    <img src={p.featured.url} alt={p.featured.alt} loading="lazy" className="absolute inset-0 size-full object-cover transition-transform duration-[1200ms] ease-butter group-hover:scale-[1.03]" />
+                    <img src={sized(p.featured.url, 960)} srcSet={srcSet(p.featured.url)} sizes="(min-width: 768px) 50vw, 100vw" alt={p.featured.alt} loading="lazy" className="absolute inset-0 size-full object-cover transition-transform duration-[1200ms] ease-butter group-hover:scale-[1.03]" />
                   ) : (
                     <div className="wood" style={{ ["--tone" as string]: "#8a6a4a", ["--boards" as string]: 3 }} />
                   )}
@@ -88,6 +93,9 @@ export default async function BlogIndex({ searchParams }: { searchParams: Promis
           )}
         </div>
       )}
+
+      {/* Extra sections added to the blog page in Admin → Site pages (first page of the list only) */}
+      {system && page === 1 && !tag && <RenderSections layout={system.layout} path="/blog/" />}
     </>
   );
 }

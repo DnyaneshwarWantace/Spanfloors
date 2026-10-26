@@ -1,13 +1,15 @@
 import Link from "next/link";
 import Dropdown from "@/components/ui/Dropdown";
-import { and, asc, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { and, asc, count, desc, eq, ilike, isNotNull, isNull, or, type SQL } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/server/auth";
+import { can } from "@/lib/permissions";
 import { Badge, btn, EmptyState, formatDate, inputCls, Notice, PageHeader } from "@/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
-const STATUSES = ["all", "published", "draft", "scheduled", "archived"] as const;
+const STATUSES = ["all", "published", "draft", "review", "scheduled", "archived"] as const;
 const PER_PAGE = 30;
 
 export default async function ContentList({
@@ -15,15 +17,20 @@ export default async function ContentList({
 }: {
   searchParams: Promise<{ type?: string; status?: string; q?: string; page?: string; sort?: string; deleted?: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser("content");
   const sp = await searchParams;
   const type = sp.type === "page" ? "page" : "post";
+  const all = can(user.role, "content.all");
+  if (type === "page" && !all) redirect("/admin/content/?type=post");
   const status = (STATUSES as readonly string[]).includes(sp.status ?? "") ? (sp.status as (typeof STATUSES)[number]) : "all";
   const q = sp.q?.trim() ?? "";
   const page = Math.max(Number(sp.page) || 1, 1);
   const sort = sp.sort === "title" ? "title" : "updated";
 
-  const where: SQL[] = [eq(schema.content.type, type)];
+  // Fixed site pages (home, blog, collections) have their own list; authors see only their own posts.
+  const scope: SQL[] = [eq(schema.content.type, type), isNull(schema.content.systemKey)];
+  if (!all) scope.push(eq(schema.content.authorId, user.id));
+  const where: SQL[] = [...scope];
   if (status !== "all") where.push(eq(schema.content.status, status));
   if (q) where.push(or(ilike(schema.content.title, `%${q}%`), ilike(schema.content.path, `%${q}%`))!);
 
@@ -52,9 +59,18 @@ export default async function ContentList({
     db
       .select({ status: schema.content.status, n: count() })
       .from(schema.content)
-      .where(eq(schema.content.type, type))
+      .where(and(...scope))
       .groupBy(schema.content.status),
   ]);
+
+  const sitePages =
+    type === "page" && all
+      ? await db
+          .select({ id: schema.content.id, title: schema.content.title, path: schema.content.path, key: schema.content.systemKey })
+          .from(schema.content)
+          .where(isNotNull(schema.content.systemKey))
+          .orderBy(asc(schema.content.path))
+      : [];
 
   const countOf = (s: string) => (s === "all" ? counts.reduce((a, c) => a + c.n, 0) : (counts.find((c) => c.status === s)?.n ?? 0));
   const href = (over: Record<string, string | number | undefined>) => {
@@ -76,6 +92,21 @@ export default async function ContentList({
           </Link>
         }
       />
+      {sitePages.length > 0 && (
+        <section aria-labelledby="site-pages" className="mb-6 border border-line bg-white/40 p-4">
+          <h2 id="site-pages" className="mb-1 text-2xs font-semibold tracking-[0.06em] uppercase">
+            Site pages
+          </h2>
+          <p className="mb-3 text-2xs text-muted">Home, Blog and the product collections. Edit their SEO, share image and extra sections.</p>
+          <div className="flex flex-wrap gap-2">
+            {sitePages.map((p) => (
+              <Link key={p.id} href={`/admin/content/${p.id}/?type=page`} className="border border-line bg-paper px-3 py-1.5 text-2xs hover:border-ink">
+                {p.key === "home" ? "Home" : p.key === "blog" ? "Blog" : p.title}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       {sp.deleted && (
         <div className="mb-4">
           <Notice tone="success">Deleted.</Notice>

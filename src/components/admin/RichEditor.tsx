@@ -145,18 +145,26 @@ function Toolbar({ editor, onImage, html, onToggleHtml }: { editor: Editor; onIm
   );
 }
 
-/** Rich-text editor. Writes its HTML into a hidden input named `name` so it submits with the form. */
+/**
+ * Rich-text editor. With `name` it writes its HTML into a hidden input so it submits with the form;
+ * with `onChange` it reports every edit (used inside page sections).
+ */
 export default function RichEditor({
   name,
   initialHtml,
   placeholder = "Start writing…",
   missingImages = [],
+  onChange,
+  compact = false,
 }: {
-  name: string;
+  name?: string;
   initialHtml: string;
   placeholder?: string;
   /** /media/ addresses whose files aren't on the server yet (shown as placeholders). */
   missingImages?: string[];
+  onChange?: (html: string) => void;
+  /** Smaller editor for section fields. */
+  compact?: boolean;
 }) {
   const [value, setValue] = useState(initialHtml);
   const [htmlMode, setHtmlMode] = useState(false);
@@ -173,10 +181,14 @@ export default function RichEditor({
     editorProps: {
       attributes: {
         class:
-          "prose-cms min-h-[28rem] max-w-full px-6 py-5 text-body leading-relaxed break-words outline-none [&_img]:h-auto [&_img]:max-w-full [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_iframe]:max-w-full [&_pre]:overflow-x-auto [&_a]:break-all [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-ink [&_blockquote]:pl-4 [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lead [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:text-title [&_img]:my-4 [&_img]:max-h-96 [&_iframe]:my-4 [&_iframe]:aspect-video [&_iframe]:w-full [&_iframe]:max-w-2xl [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_.is-editor-empty:first-child::before]:pointer-events-none [&_.is-editor-empty:first-child::before]:float-left [&_.is-editor-empty:first-child::before]:h-0 [&_.is-editor-empty:first-child::before]:text-muted [&_.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
+          `prose-cms ${compact ? "min-h-40" : "min-h-[28rem]"} max-w-full px-6 py-5 text-body leading-relaxed break-words outline-none [&_img]:h-auto [&_img]:max-w-full [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_iframe]:max-w-full [&_pre]:overflow-x-auto [&_a]:break-all [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-ink [&_blockquote]:pl-4 [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lead [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:text-title [&_img]:my-4 [&_img]:max-h-96 [&_iframe]:my-4 [&_iframe]:aspect-video [&_iframe]:w-full [&_iframe]:max-w-2xl [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_.is-editor-empty:first-child::before]:pointer-events-none [&_.is-editor-empty:first-child::before]:float-left [&_.is-editor-empty:first-child::before]:h-0 [&_.is-editor-empty:first-child::before]:text-muted [&_.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]`,
       },
     },
-    onUpdate: ({ editor: e }) => setValue(fromEditor(e.getHTML())),
+    onUpdate: ({ editor: e }) => {
+      const html = fromEditor(e.getHTML());
+      setValue(html);
+      onChange?.(html);
+    },
   });
 
   // Keep the visual editor in sync when returning from HTML mode.
@@ -186,14 +198,17 @@ export default function RichEditor({
 
   return (
     <div className="min-w-0 max-w-full border border-line bg-white/60">
-      <input type="hidden" name={name} value={value} />
+      {name && <input type="hidden" name={name} value={value} />}
       {editor && <Toolbar editor={editor} onImage={() => setPicking(true)} html={htmlMode} onToggleHtml={() => setHtmlMode((h) => !h)} />}
       {htmlMode ? (
         <textarea
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            setValue(e.target.value);
+            onChange?.(e.target.value);
+          }}
           spellCheck={false}
-          className={`${inputCls} min-h-[28rem] border-0 bg-transparent font-mono text-2xs leading-relaxed`}
+          className={`${inputCls} ${compact ? "min-h-40" : "min-h-[28rem]"} border-0 bg-transparent font-mono text-2xs leading-relaxed`}
           aria-label="HTML source"
         />
       ) : (

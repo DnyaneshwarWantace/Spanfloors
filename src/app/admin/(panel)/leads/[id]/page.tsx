@@ -32,7 +32,7 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
 }
 
 export default async function LeadDetail({ params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  await requireUser("leads");
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const [lead] = await db.select().from(schema.leads).where(eq(schema.leads.id, id));

@@ -43,6 +43,55 @@
       "when": 1792564649109,
       "tag": "0005_author_name",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792951947550,
+      "tag": "0006_content_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792980471565,
+      "tag": "0007_previews",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792995353001,
+      "tag": "0008_seo",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792998772056,
+      "tag": "0009_site_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792999680375,
+      "tag": "0010_media_folder",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793000588210,
+      "tag": "0011_product_extras",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793003677999,
+      "tag": "0012_blog_security",
+      "breakpoints": true
     }
   ]
 }

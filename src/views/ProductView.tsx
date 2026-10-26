@@ -20,7 +20,9 @@ import {
   type CatalogProduct,
   type CategoryKey,
 } from "@/lib/catalog";
-import { breadcrumbLd, JsonLd, legacyFor, pageMetadata, SITE_URL } from "@/lib/seo";
+import { breadcrumbLd, JsonLd, legacyFor, SITE_URL } from "@/lib/seo";
+import { buildMetadata } from "@/server/metadata";
+import { badgeLabel } from "@/lib/badges";
 
 export async function productStaticParams(key: CategoryKey) {
   try {
@@ -34,15 +36,20 @@ export async function productMetadata(key: CategoryKey, slug: string): Promise<M
   const c = getCategory(key);
   const p = await getProduct(key, slug).catch(() => null);
   if (!p) return { title: c.title };
-  const meta = pageMetadata(p.href, {
-    title: `${displayName(p)} - Span Floors`,
+  // Admin SEO and share settings win over the old site's values, which win over generated ones.
+  const photo = productImages(p)[0] ?? null;
+  return buildMetadata({
+    path: p.href,
+    title: displayName(p),
     description: describe(p, c.title),
-    image: productImages(p)[0] ?? null,
+    seoTitle: p.seoTitle,
+    seoDescription: p.seoDescription,
+    ogTitle: p.ogTitle,
+    ogDescription: p.ogDescription,
+    ogImage: p.ogImage,
+    photo: photo?.startsWith("/media/") ? photo : null,
+    kicker: c.title,
   });
-  // Admin SEO overrides win over legacy/generated values.
-  if (p.seoTitle) meta.title = { absolute: p.seoTitle };
-  if (p.seoDescription) meta.description = p.seoDescription;
-  return meta;
 }
 
 function describe(p: CatalogProduct, categoryTitle: string): string {
@@ -123,12 +130,18 @@ export default async function ProductView({ categoryKey, slug }: { categoryKey: 
   // Other tones in the same format (and brand when known), shown as swatches like a colour range.
   const tones = inCategory.filter((x) => x.id === p.id || (formatOf(x) === format && (!p.brand || x.brand === p.brand) && x.collection)).slice(0, 10);
 
-  const similar = inCategory
-    .filter((x) => x.id !== p.id)
-    .sort(
-      (a, b) =>
-        Number(b.collection === p.collection) - Number(a.collection === p.collection) || Number(formatOf(b) === format) - Number(formatOf(a) === format),
-    )
+  // Hand-picked related products and accessories (any collection) come first, then similar ones.
+  const picked = p.relatedIds.map((id) => catalog.find((x) => x.id === id)).filter((x): x is (typeof catalog)[number] => Boolean(x) && x!.id !== p.id);
+  const similar = [
+    ...picked,
+    ...inCategory.filter((x) => x.id !== p.id && !p.relatedIds.includes(x.id)),
+  ]
+    .sort((a, b) => {
+      const pa = p.relatedIds.indexOf(a.id);
+      const pb = p.relatedIds.indexOf(b.id);
+      if (pa >= 0 || pb >= 0) return (pa < 0 ? 999 : pa) - (pb < 0 ? 999 : pb);
+      return Number(b.collection === p.collection) - Number(a.collection === p.collection) || Number(formatOf(b) === format) - Number(formatOf(a) === format);
+    })
     .slice(0, 10)
     .map(toCard);
 
@@ -191,6 +204,15 @@ export default async function ProductView({ categoryKey, slug }: { categoryKey: 
             {p.brand && <span> · {p.brand}</span>}
           </nav>
           <h1 className="mono mt-3 text-title">{legacy?.h1 ?? name}</h1>
+          {p.badges.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {p.badges.map(badgeLabel).filter(Boolean).map((b) => (
+                <span key={b} className="border border-ink px-2 py-0.5 text-2xs">
+                  {b}
+                </span>
+              ))}
+            </div>
+          )}
 
           {p.dimensions && (
             <div className="mono mt-12 mb-6 flex items-baseline justify-between gap-4 border-b border-line pb-3 text-body">
@@ -362,7 +384,7 @@ export default async function ProductView({ categoryKey, slug }: { categoryKey: 
       {similar.length > 0 && (
         <section className="pb-24">
           <div className="mx-gap mb-[7rem] flex items-baseline justify-between border-t border-line pt-3.5">
-            <h2 className="mono text-title">Similar Products</h2>
+            <h2 className="mono text-title">{picked.length ? "Goes well with" : "Similar Products"}</h2>
             <Link className="arrow-link" href={`/${c.slug}/`}>
               View all {c.title.toLowerCase()}
             </Link>

@@ -65,10 +65,13 @@ export function Card({ title, children, actions }: { title?: string; children: R
 const STATUS_STYLE: Record<string, string> = {
   published: "bg-[#3d7a4a]/12 text-[#2f6339]",
   scheduled: "bg-[#a08a62]/18 text-[#6e5a35]",
+  review: "bg-[#2f5d8a]/12 text-[#244a6e]",
   draft: "bg-ink/8 text-ink-2",
   archived: "bg-ink/5 text-muted",
   admin: "bg-ink text-paper",
   editor: "bg-ink/8 text-ink-2",
+  author: "bg-ink/8 text-ink-2",
+  sales: "bg-ink/8 text-ink-2",
 };
 
 export function Badge({ value, label }: { value: string; label?: string }) {

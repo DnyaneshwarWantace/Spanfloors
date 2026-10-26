@@ -6,6 +6,7 @@ import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { User } from "@/db/schema";
 import { randomToken, sha256, verifyPassword } from "./crypto";
+import { can, type Permission } from "@/lib/permissions";
 
 export const SESSION_COOKIE = "sf_session";
 const SESSION_DAYS = 14;
@@ -116,11 +117,14 @@ export const currentUser = cache(async (): Promise<SessionUser | null> => {
   return { id: row.id, email: row.email, name: row.name, role: row.role };
 });
 
-/** For admin pages and server actions: redirects to login if signed out; 403-style redirect if the role is too low. */
-export async function requireUser(role: "editor" | "admin" = "editor"): Promise<SessionUser> {
+/**
+ * For admin pages and server actions: redirects to the login page when signed out, and to the dashboard
+ * (with a "not allowed" notice) when the user's role doesn't include this permission.
+ */
+export async function requireUser(permission: Permission = "dashboard"): Promise<SessionUser> {
   const user = await currentUser();
   if (!user) redirect("/admin/login/");
-  if (role === "admin" && user.role !== "admin") redirect("/admin/?denied=1");
+  if (!can(user.role, permission)) redirect("/admin/?denied=1");
   return user;
 }
 

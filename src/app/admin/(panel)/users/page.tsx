@@ -6,6 +6,9 @@ import { db, schema } from "@/db";
 import { isHttps, logActivity, requireUser } from "@/server/auth";
 import { hashPassword, randomToken } from "@/server/crypto";
 import { Badge, btn, formatDate, inputCls, Notice, PageHeader } from "@/components/admin/ui";
+import { ROLES, type Role } from "@/lib/permissions";
+
+const roleOf = (v: FormDataEntryValue | null): Role => (ROLES.some((r) => r.value === v) ? (v as Role) : "editor");
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +25,10 @@ async function flashPassword(email: string, temp: string, reset: boolean) {
 
 async function inviteUser(form: FormData) {
   "use server";
-  const me = await requireUser("admin");
+  const me = await requireUser("users");
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const name = String(form.get("name") ?? "").trim();
-  const role = form.get("role") === "admin" ? "admin" : "editor";
+  const role = roleOf(form.get("role"));
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !name) redirect("/admin/users/?error=invalid");
   const [exists] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email));
   if (exists) redirect("/admin/users/?error=exists");
@@ -38,14 +41,15 @@ async function inviteUser(form: FormData) {
 
 async function updateUser(form: FormData) {
   "use server";
-  const me = await requireUser("admin");
+  const me = await requireUser("users");
   const id = String(form.get("id"));
   const op = String(form.get("op"));
   if (id === me.id && op !== "reset") redirect("/admin/users/?error=self");
   const [u] = await db.select().from(schema.users).where(eq(schema.users.id, id));
   if (!u) redirect("/admin/users/");
   if (op === "role") {
-    const role = u.role === "admin" ? "editor" : "admin";
+    const role = roleOf(form.get("role"));
+    if (role === u.role) redirect("/admin/users/");
     await db.update(schema.users).set({ role, updatedAt: new Date() }).where(eq(schema.users.id, id));
     await logActivity(me.id, "update", "user", id, `${u.email} is now ${role}`);
   } else if (op === "active") {
@@ -69,7 +73,7 @@ const ERRORS: Record<string, string> = {
 };
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const me = await requireUser("admin");
+  const me = await requireUser("users");
   const sp = await searchParams;
   let flash: { email: string; temp: string; reset: boolean } | null = null;
   try {
@@ -79,7 +83,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Users" description="Admins manage everything, including API keys and users. Editors manage blog posts, pages, media, site settings and redirects." />
+      <PageHeader title="Users" description="Admin: everything, including users and API keys. Editor: pages, blog, media, products, leads and site settings. Author: writes blog posts that an editor publishes. Sales: leads only." />
 
       <div className="mb-6 grid gap-3">
         {sp.error && <Notice tone="error">{ERRORS[sp.error] ?? "Something went wrong."}</Notice>}
@@ -92,7 +96,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         )}
       </div>
 
-      <form action={inviteUser} className="mb-8 grid items-end gap-3 border border-line bg-white/40 p-4 md:grid-cols-[1fr_1fr_9rem_auto]">
+      <form action={inviteUser} className="mb-8 grid items-end gap-3 border border-line bg-white/40 p-4 md:grid-cols-[1fr_1fr_12rem_auto]">
         <label className="grid gap-1.5 text-2xs font-medium">
           Name
           <input name="name" required className={inputCls} />
@@ -107,10 +111,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             name="role"
             defaultValue="editor"
             aria-label="Role"
-            options={[
-              { value: "editor", label: "Editor", hint: "Blog, pages, media, settings" },
-              { value: "admin", label: "Admin", hint: "Everything, incl. API keys & users" },
-            ]}
+            options={ROLES}
           />
         </label>
         <button className={btn.primary}>Add user</button>
@@ -137,7 +138,15 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   <div className="text-muted">{u.email}</div>
                 </td>
                 <td className="px-4 py-3">
-                  <Badge value={u.role} />
+                  {u.id === me.id ? (
+                    <Badge value={u.role} />
+                  ) : (
+                    <form action={updateUser} className="w-40">
+                      <input type="hidden" name="id" value={u.id} />
+                      <input type="hidden" name="op" value="role" />
+                      <Dropdown name="role" defaultValue={u.role} options={ROLES} submitOnChange size="sm" aria-label={`Role for ${u.name}`} />
+                    </form>
+                  )}
                 </td>
                 <td className="px-4 py-3">{u.active ? "Active" : <span className="text-muted">Deactivated</span>}</td>
                 <td className="px-4 py-3 text-muted">{formatDate(u.lastLoginAt, true)}</td>
@@ -145,11 +154,6 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   <div className="flex justify-end gap-1">
                     {u.id !== me.id && (
                       <>
-                        <form action={updateUser}>
-                          <input type="hidden" name="id" value={u.id} />
-                          <input type="hidden" name="op" value="role" />
-                          <button className={btn.ghost}>Make {u.role === "admin" ? "editor" : "admin"}</button>
-                        </form>
                         <form action={updateUser}>
                           <input type="hidden" name="id" value={u.id} />
                           <input type="hidden" name="op" value="active" />

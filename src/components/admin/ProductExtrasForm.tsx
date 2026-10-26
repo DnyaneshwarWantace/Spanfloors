@@ -3,6 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import RichEditor from "./RichEditor";
 import MediaLibrary from "./MediaLibrary";
+import { BADGES } from "@/lib/badges";
 import { btn, Field, inputCls, Notice } from "./ui";
 import { saveProductExtras, testExternalImage, type ProductSaveState } from "@/app/admin/(panel)/products/actions";
 
@@ -19,6 +20,11 @@ export type ProductExtras = {
   useExternalImages: boolean;
   seoTitle: string;
   seoDescription: string;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: { id: string; url: string } | null;
+  badges: string[];
+  relatedIds: string[];
 };
 
 type TestResult = { ok: boolean; url?: string; message: string };
@@ -50,12 +56,83 @@ function ExternalIdRow({ id, onRemove, primary }: { id: string; onRemove?: () =>
   );
 }
 
-export default function ProductExtrasForm({ initial, twentyImageId, defaultName }: { initial: ProductExtras; twentyImageId: string | null; defaultName: string }) {
+/** Hand-picked related products and accessories, in order. */
+function RelatedPicker({ options, value, onChange }: { options: { id: string; name: string; collection: string }[]; value: string[]; onChange: (v: string[]) => void }) {
+  const [q, setQ] = useState("");
+  const byId = new Map(options.map((o) => [o.id, o]));
+  const hits = q ? options.filter((o) => !value.includes(o.id) && `${o.name} ${o.collection}`.toLowerCase().includes(q.toLowerCase())).slice(0, 12) : [];
+  const move = (i: number, d: number) => {
+    const n = [...value];
+    const [x] = n.splice(i, 1);
+    n.splice(i + d, 0, x);
+    onChange(n);
+  };
+  return (
+    <div className="grid gap-2">
+      {value.length > 0 && (
+        <ol className="grid gap-1">
+          {value.map((id, i) => (
+            <li key={id} className="flex min-w-0 items-center gap-2 border border-line bg-paper px-2 py-1.5 text-2xs">
+              <span className="w-5 shrink-0 text-muted tabular-nums">{i + 1}.</span>
+              <span className="min-w-0 flex-1 truncate">
+                {byId.get(id)?.name ?? "Product no longer live"} <span className="text-muted">· {byId.get(id)?.collection}</span>
+              </span>
+              <button type="button" className="px-1.5 text-muted hover:text-ink disabled:opacity-30" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">
+                ↑
+              </button>
+              <button type="button" className="px-1.5 text-muted hover:text-ink disabled:opacity-30" disabled={i === value.length - 1} onClick={() => move(i, 1)} aria-label="Move down">
+                ↓
+              </button>
+              <button type="button" className="px-1.5 text-muted hover:text-brand" onClick={() => onChange(value.filter((x) => x !== id))}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {value.length < 12 && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search products and accessories to add…" className={inputCls} aria-label="Search related products" />}
+      {hits.length > 0 && (
+        <ul className="grid max-h-56 gap-px overflow-y-auto border border-line">
+          {hits.map((o) => (
+            <li key={o.id}>
+              <button
+                type="button"
+                className="flex w-full min-w-0 justify-between gap-3 px-2 py-1.5 text-left text-2xs hover:bg-paper-2"
+                onClick={() => {
+                  onChange([...value, o.id]);
+                  setQ("");
+                }}
+              >
+                <span className="min-w-0 truncate">{o.name}</span>
+                <span className="shrink-0 text-muted">{o.collection}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export default function ProductExtrasForm({
+  initial,
+  twentyImageId,
+  defaultName,
+  productOptions = [],
+}: {
+  initial: ProductExtras;
+  twentyImageId: string | null;
+  defaultName: string;
+  productOptions?: { id: string; name: string; collection: string }[];
+}) {
   const [state, action, pending] = useActionState<ProductSaveState, FormData>(saveProductExtras, {});
   const [gallery, setGallery] = useState(initial.gallery);
   const [extIds, setExtIds] = useState(initial.externalImageIds);
   const [newId, setNewId] = useState("");
   const [picking, setPicking] = useState(false);
+  const [shareImage, setShareImage] = useState(initial.ogImage);
+  const [related, setRelated] = useState(initial.relatedIds);
+  const [pickingShare, setPickingShare] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   const moveTo = (from: number, to: number) =>
@@ -91,6 +168,23 @@ export default function ProductExtrasForm({ initial, twentyImageId, defaultName 
             <a href="/admin/products/arrange/" className="text-muted underline">arrange visually</a>
           </label>
         </div>
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-2xs">
+          <span className="font-medium">Badges</span>
+          {BADGES.map((b) => (
+            <label key={b.key} className="flex items-center gap-1.5">
+              <input type="checkbox" name="badges" value={b.key} defaultChecked={initial.badges.includes(b.key)} /> {b.label}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-3 border border-line bg-white/40 p-4">
+        <div>
+          <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Goes well with</h2>
+          <p className="mt-1 text-2xs text-muted">Related products or accessories (skirting, underlay, care kits) shown first on this product’s page. Similar products fill the rest.</p>
+        </div>
+        <input type="hidden" name="relatedIds" value={related.join(",")} />
+        <RelatedPicker options={productOptions.filter((o) => o.id !== initial.twentyId)} value={related} onChange={setRelated} />
       </section>
 
       <section className="border border-line bg-white/40 p-4">
@@ -200,6 +294,50 @@ export default function ProductExtrasForm({ initial, twentyImageId, defaultName 
           <textarea id="seoDescription" name="seoDescription" defaultValue={initial.seoDescription} maxLength={320} rows={3} className={`${inputCls} h-auto py-2`} />
         </Field>
       </section>
+
+      <section className="grid gap-4 border border-line bg-white/40 p-4">
+        <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Sharing (WhatsApp, Telegram, social)</h2>
+        <input type="hidden" name="ogImageMediaId" value={shareImage?.id ?? ""} />
+        <div className="flex flex-wrap items-center gap-3">
+          {shareImage && <img src={shareImage.url} alt="" className="h-16 w-28 object-cover" />}
+          <button type="button" className={btn.secondary} onClick={() => setPickingShare(true)}>
+            {shareImage ? "Change share image" : "Choose share image"}
+          </button>
+          {shareImage && (
+            <button type="button" className={btn.ghost} onClick={() => setShareImage(null)}>
+              Use the automatic card
+            </button>
+          )}
+        </div>
+        <p className="text-2xs text-muted">Without a share image, a branded card with the product name and its first photo is used. Best at 1200 × 630 pixels.</p>
+        <Field label="Share title (optional)" htmlFor="ogTitle">
+          <input id="ogTitle" name="ogTitle" defaultValue={initial.ogTitle} maxLength={120} className={inputCls} />
+        </Field>
+        <Field label="Share description (optional)" htmlFor="ogDescription">
+          <textarea id="ogDescription" name="ogDescription" defaultValue={initial.ogDescription} maxLength={300} rows={2} className={`${inputCls} h-auto py-2`} />
+        </Field>
+      </section>
+
+      {pickingShare && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-6" onClick={() => setPickingShare(false)}>
+          <div role="dialog" aria-modal="true" aria-label="Share image" className="max-h-[85vh] w-full max-w-5xl overflow-y-auto bg-paper p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="mono text-title">Share image</h2>
+              <button type="button" className={btn.ghost} onClick={() => setPickingShare(false)}>
+                Close
+              </button>
+            </div>
+            <MediaLibrary
+              picker
+              initialKind="image"
+              onPick={(m) => {
+                setShareImage({ id: m.id, url: m.url });
+                setPickingShare(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="sticky bottom-0 -mx-4 flex flex-wrap sm:-mx-6 items-center gap-3 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur sm:px-6 lg:-mx-10 lg:px-10">
         <button className={btn.primary} disabled={pending}>
