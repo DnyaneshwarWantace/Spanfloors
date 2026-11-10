@@ -162,6 +162,29 @@ export const TEXT_DEFAULTS = {
   "blog.all": "All articles",
   "notFound.title": "Page not found",
   "notFound.text": "The page you were looking for has moved or no longer exists.",
+  "menu.products": "Products",
+  "menu.follow": "Follow",
+  "home.introButton": "Our Story",
+  "home.surfaces": "Our Surfaces",
+  "home.projects": "Span Floors Projects",
+  "home.samplesTitle": "Free Samples",
+  "home.samplesText": "See and feel our floors at home. Order up to five free samples and we will deliver them to your door.",
+  "home.samplesButton": "Order Samples",
+  "home.studioButton": "Visit a Studio",
+  "home.featuredCollection": "Featured Collection:",
+  "home.videos": "Featured Video",
+  "home.videoButton": "Watch video",
+  "home.blog": "From the Blog",
+  "home.blogButton": "View all articles",
+  "home.resources": "Featured Resources",
+  "home.resourcesButton": "Browse all files",
+  "home.adviceTitle": "Specialist Advice",
+  "home.adviceText": "Not sure which floor suits your space? Talk to our flooring advisors, visit a studio, or book a video call with our architects' team.",
+  "home.videoCallButton": "Book a Video Call",
+  "product.samples": "Free samples, delivered across India",
+  "product.comingSoon": "This range is being photographed. Contact us for the full catalogue and samples.",
+  "product.enquire": "Enquire Now",
+  "product.similar": "Similar Products",
 } as const;
 
 export type TextKey = keyof typeof TEXT_DEFAULTS;
@@ -170,6 +193,9 @@ export const TEXT_LABELS: Record<string, string> = {
   footer: "Footer",
   blog: "Blog",
   notFound: "Page not found",
+  menu: "Menus",
+  home: "Home page",
+  product: "Product pages",
 };
 
 const load = cache(async () => {

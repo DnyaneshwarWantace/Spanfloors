@@ -64,7 +64,7 @@ async function main() {
     })
     .from(schema.content)
     .leftJoin(schema.media, eq(schema.media.id, schema.content.featuredMediaId))
-    .where(inArray(schema.content.status, ["published", "draft"]))
+    .where(inArray(schema.content.status, ["published", "draft", "archived"]))
     .orderBy(desc(schema.content.publishedAt));
 
   // Photos used inside page sections, so the preview can show them.
@@ -101,6 +101,8 @@ async function main() {
     pages: content.filter((c) => c.type === "page" && !c.systemKey && c.status === "published"),
     posts: content.filter((c) => c.type === "post" && c.status === "published"),
     systemPages: content.filter((c) => c.systemKey && c.status === "published"),
+    /** Every fixed site page (home, blog, collections) whatever its status: their texts (e.g. a collection's excerpt) are settings. */
+    allSystemPages: content.filter((c) => c.systemKey),
     /** Drafts, for previewing pages the menus link to before they are published (e.g. Contact). */
     draftPages: content.filter((c) => c.type === "page" && !c.systemKey && c.status === "draft"),
     redirects,
