@@ -251,3 +251,4 @@ export async function assetsByIds(ids: string[]) {
   if (!ids.length) return [];
   return db.select().from(schema.allsyAssets).where(inArray(schema.allsyAssets.id, ids));
 }
+

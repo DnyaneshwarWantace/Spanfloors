@@ -2,12 +2,14 @@ import SettingsForm from "@/components/admin/SettingsForm";
 import { PageHeader } from "@/components/admin/ui";
 import { requireUser } from "@/server/auth";
 import { settingsForAdmin } from "@/server/settings";
+import { getConfig } from "@/server/site-config";
+import FormFieldsEditor from "@/components/admin/FormFieldsEditor";
 
 export const dynamic = "force-dynamic";
 
 export default async function FormsSettingsPage() {
   await requireUser("settings.forms");
-  const rows = (await settingsForAdmin()).filter((r) => r.group === "forms");
+  const [rows, formsConfig] = await Promise.all([settingsForAdmin().then((all) => all.filter((r) => r.group === "forms")), getConfig("config.forms")]);
   return (
     <>
       <PageHeader title="Forms & bookings" description="Where website leads are emailed, the customer auto-reply, WhatsApp, and booking availability." />
@@ -29,6 +31,9 @@ export default async function FormsSettingsPage() {
           },
         ]}
       />
+      <h2 className="mt-12 mb-1 text-title">Form fields</h2>
+      <p className="mb-5 max-w-3xl text-2xs text-muted">Choose which extra questions each website form asks. Fewer questions usually means more enquiries.</p>
+      <FormFieldsEditor saved={formsConfig} />
     </>
   );
 }

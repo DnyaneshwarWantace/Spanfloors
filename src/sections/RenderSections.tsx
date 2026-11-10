@@ -2,7 +2,7 @@ import "server-only";
 import { displayName, getCatalog } from "@/lib/catalog";
 import { JsonLd, SITE_URL } from "@/lib/seo";
 import { getStudios } from "@/server/site-ld";
-import { getTexts } from "@/server/site-config";
+import { getConfig, getTexts } from "@/server/site-config";
 import { BLOCKS, type BlockContext } from "./components/blocks";
 import { resolveSections, type Resolved } from "./resolve";
 import type { Section } from "./types";
@@ -49,15 +49,17 @@ async function context(r: Resolved, preview: boolean): Promise<BlockContext> {
   const needsSamples = r.sections.some((s) => s.type === "form" && s.data.formType === "sample");
   const needsStudios = r.sections.some((s) => s.type === "studios");
   const needsTexts = r.sections.some((s) => s.type === "form" || s.type === "downloads");
-  const [catalog, studios, texts] = await Promise.all([
+  const [catalog, studios, texts, formsConfig] = await Promise.all([
     needsSamples ? getCatalog().catch(() => []) : Promise.resolve([]),
     needsStudios ? getStudios() : Promise.resolve([]),
     needsTexts ? getTexts() : Promise.resolve({}),
+    needsTexts ? getConfig("config.forms") : Promise.resolve({}),
   ]);
   return {
     sampleProducts: catalog.filter((p) => p.categoryKey !== "accessories").map((p) => ({ id: p.id, name: displayName(p) })),
     studios: studios.map((s) => ({ name: s.name, address: s.address, phone: s.phone || undefined, hours: s.hours || undefined, mapUrl: s.mapUrl || undefined })),
     texts: texts as Record<string, string>,
+    formsConfig,
     first: false,
     preview,
   };

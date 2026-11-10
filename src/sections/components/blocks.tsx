@@ -24,6 +24,8 @@ export type BlockProps = {
 export type BlockContext = {
   studios: { name: string; address: string; phone?: string; hours?: string; mapUrl?: string }[];
   sampleProducts: { id: string; name: string }[];
+  /** Admin → Forms field settings. */
+  formsConfig?: Record<string, Record<string, string>>;
   /** Words from Admin → Shared texts used by forms. */
   texts: Record<string, string>;
   /** True for the first visible section (eager-load its photo). */
@@ -434,7 +436,7 @@ function Downloads({ section, r, ctx }: BlockProps) {
                   <details className="group">
                     <summary className="inline-flex h-10 cursor-pointer list-none items-center border border-current/40 px-4 text-2xs [&::-webkit-details-marker]:hidden">Download</summary>
                     <div className="mt-4">
-                      <SiteForm type="download" compact downloadId={file.id} downloadUrl={file.url} texts={ctx.texts} />
+                      <SiteForm type="download" compact downloadId={file.id} downloadUrl={file.url} texts={ctx.texts} formsConfig={ctx.formsConfig} />
                     </div>
                   </details>
                 ) : (
@@ -465,7 +467,7 @@ function FormBlock({ section, r, ctx }: BlockProps) {
         )}
         <div className={img ? "" : "mx-auto w-full max-w-3xl"}>
           <Heading heading={x.heading} intro={x.intro} dark={section.theme === "dark"} />
-          <SiteForm type={type} products={ctx.sampleProducts} texts={ctx.texts} />
+          <SiteForm type={type} products={ctx.sampleProducts} texts={ctx.texts} formsConfig={ctx.formsConfig} />
         </div>
       </div>
     </Shell>

@@ -5,10 +5,13 @@ import { redirect } from "next/navigation";
 import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { User } from "@/db/schema";
-import { randomToken, sha256, verifyPassword } from "./crypto";
+import { decrypt, encrypt, randomToken, sha256, verifyPassword } from "./crypto";
+import { consumeRecoveryCode, verifyTotp } from "./totp";
 import { can, type Permission } from "@/lib/permissions";
 
 export const SESSION_COOKIE = "sf_session";
+/** Readable by the site's scripts; only says "someone signed in here". The real check is the session. */
+export const ADMIN_HINT_COOKIE = "sf_admin";
 const SESSION_DAYS = 14;
 
 export type SessionUser = Pick<User, "id" | "email" | "name" | "role">;
@@ -52,7 +55,7 @@ export async function isHttps() {
   return (process.env.NEXT_PUBLIC_SITE_URL ?? "").startsWith("https://") && !(h.get("host") ?? "").startsWith("localhost");
 }
 
-export type LoginResult = { user: SessionUser } | { error: "invalid" | "locked" };
+export type LoginResult = { user: SessionUser } | { twoStep: true } | { error: "invalid" | "locked" };
 
 /** Checks email + password (with lockout); on success creates a session and sets the cookie. */
 export async function login(email: string, password: string): Promise<LoginResult> {
@@ -72,6 +75,22 @@ export async function login(email: string, password: string): Promise<LoginResul
   }
   await db.delete(schema.loginAttempts).where(eq(schema.loginAttempts.key, keys[0]));
 
+  // Two-step sign-in: the password was right, now ask for the authenticator code before creating a session.
+  if (user.totpEnabled && user.totpSecret) {
+    (await cookies()).set(TWO_STEP_COOKIE, encrypt(JSON.stringify({ u: user.id, e: Date.now() + TWO_STEP_MINUTES * 60_000 })), {
+      httpOnly: true,
+      secure: await isHttps(),
+      sameSite: "lax",
+      path: "/admin/",
+      maxAge: TWO_STEP_MINUTES * 60,
+    });
+    return { twoStep: true };
+  }
+  return { user: await startSession(user, ip) };
+}
+
+/** Creates the session row and cookie for a fully signed-in user. */
+async function startSession(user: User, ip: string, how = "signed in"): Promise<SessionUser> {
   const token = randomToken();
   const h = await headers();
   await db.insert(schema.sessions).values({
@@ -93,8 +112,60 @@ export async function login(email: string, password: string): Promise<LoginResul
     path: "/",
     maxAge: SESSION_DAYS * 86400,
   });
-  await logActivity(user.id, "login", "user", user.id, `${user.email} signed in`);
-  return { user: { id: user.id, email: user.email, name: user.name, role: user.role } };
+  // A plain marker (no secret) so the public site knows to ask whether to show the "Edit this page" bar.
+  (await cookies()).set(ADMIN_HINT_COOKIE, "1", { secure: await isHttps(), sameSite: "lax", path: "/", maxAge: SESSION_DAYS * 86400 });
+  await logActivity(user.id, "login", "user", user.id, `${user.email} ${how}`);
+  return { id: user.id, email: user.email, name: user.name, role: user.role };
+}
+
+/* ---------- Two-step sign-in (second screen) ---------- */
+
+const TWO_STEP_COOKIE = "sf_2fa";
+const TWO_STEP_MINUTES = 5;
+
+/** The user waiting to enter their code, if the password step was passed in the last few minutes. */
+export async function pendingTwoStep(): Promise<User | null> {
+  const raw = (await cookies()).get(TWO_STEP_COOKIE)?.value;
+  if (!raw) return null;
+  try {
+    const { u, e } = JSON.parse(decrypt(raw)) as { u: string; e: number };
+    if (typeof u !== "string" || !(e > Date.now())) return null;
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, u));
+    return user?.active && user.totpEnabled && user.totpSecret ? user : null;
+  } catch {
+    return null;
+  }
+}
+
+export type TwoStepResult = { user: SessionUser } | { error: "invalid" | "locked" | "expired" };
+
+/** Checks the authenticator code (or a one-time recovery code) and finishes signing in. */
+export async function finishTwoStep(code: string): Promise<TwoStepResult> {
+  const user = await pendingTwoStep();
+  if (!user) return { error: "expired" };
+  const ip = await clientIp();
+  const key = `2fa:${user.id}`;
+  if (await isLocked([key, `ip:${ip}`])) return { error: "locked" };
+
+  let how = "signed in (two-step)";
+  let ok = verifyTotp(decrypt(user.totpSecret!), code);
+  if (!ok && code.replace(/\s/g, "").length > 6) {
+    const left = consumeRecoveryCode(user.recoveryCodes, code);
+    if (left) {
+      ok = true;
+      how = `signed in with a recovery code (${left.length} left)`;
+      await db.update(schema.users).set({ recoveryCodes: left }).where(eq(schema.users.id, user.id));
+    }
+  }
+  if (!ok) {
+    await recordFailure(key, LIMITS.email);
+    await recordFailure(`ip:${ip}`, LIMITS.ip);
+    await logActivity(user.id, "login_failed", "user", user.id, `Wrong two-step code for ${user.email} from ${ip}`);
+    return { error: "invalid" };
+  }
+  await db.delete(schema.loginAttempts).where(eq(schema.loginAttempts.key, key));
+  (await cookies()).delete({ name: TWO_STEP_COOKIE, path: "/admin/" });
+  return { user: await startSession(user, ip, how) };
 }
 
 export async function logout() {
@@ -102,6 +173,7 @@ export async function logout() {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await db.delete(schema.sessions).where(eq(schema.sessions.id, sha256(token)));
   jar.delete(SESSION_COOKIE);
+  jar.delete(ADMIN_HINT_COOKIE);
 }
 
 /** The signed-in user for this request, or null. */

@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { count, desc, eq, and, gte, inArray } from "drizzle-orm";
+import { count, desc, eq, and, gte } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/server/auth";
 import { btn, Card, formatDate, PageHeader } from "@/components/admin/ui";
 import { can } from "@/lib/permissions";
+import { siteHealth } from "@/server/seo-audit";
+import { adminTodos, type Todo } from "@/server/todos";
 
 export const dynamic = "force-dynamic";
 
@@ -42,24 +44,33 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const seeContent = can(user.role, "content");
   const seeAll = can(user.role, "content.all");
   const startOfDay = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) + "T00:00:00+05:30");
-  const [[{ n: leadsToday }], [{ n: leadsNew }], [{ n: notInTwenty }]] = await Promise.all([
+  const [[{ n: leadsToday }], [{ n: leadsNew }]] = await Promise.all([
     db.select({ n: count() }).from(schema.leads).where(gte(schema.leads.createdAt, startOfDay)),
     db.select({ n: count() }).from(schema.leads).where(eq(schema.leads.status, "new")),
-    db.select({ n: count() }).from(schema.leads).where(inArray(schema.leads.twentyStatus, ["pending", "failed"])),
   ]);
 
-  const stats = [
+  const [todos, health] = await Promise.all([adminTodos(user), seeAll ? siteHealth().catch(() => null) : Promise.resolve(null)]);
+  const KIND: Record<Todo["kind"], { label: string; dot: string }> = {
+    now: { label: "Waiting", dot: "bg-brand" },
+    fix: { label: "Fix", dot: "bg-[#a0661f]" },
+    setup: { label: "Set up", dot: "bg-[#3b5f8a]" },
+    tidy: { label: "When you have time", dot: "bg-muted" },
+  };
+
+  type Stat = { label: string; value: number | string; note?: string; href: string };
+  const stats = ([
     seeLeads && { label: "Form leads today", value: leadsToday, note: `${leadsNew} new in total`, href: "/admin/leads/?status=new" },
     seeContent && { label: "Blog posts", value: postsLive, note: `${postsDraft} drafts`, href: "/admin/content/?type=post" },
     seeAll && { label: "Pages", value: pagesLive, note: `${pagesDraft} drafts`, href: "/admin/content/?type=page" },
     can(user.role, "media") && { label: "Media files", value: mediaCount, href: "/admin/media/" },
-  ].filter((x): x is { label: string; value: number; note?: string; href: string } => Boolean(x));
+    health && { label: "Google score", value: `${health.seoAverage}/100`, note: `average of ${health.pages} pages`, href: "/admin/seo/" },
+  ] as (Stat | false | null)[]).filter((x): x is Stat => Boolean(x));
 
   return (
     <>
       <PageHeader
         title={`Welcome, ${user.name.split(" ")[0]}`}
-        description="Manage the Span Floors website."
+        description="Here is what needs doing on the website today."
         actions={
           seeContent && (
             <>
@@ -78,11 +89,32 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       {denied && <p className="mb-6 border border-brand/40 bg-brand/5 px-4 py-3 text-2xs">Your account doesn’t have access to that section. Ask an admin if you need it.</p>}
 
-      {seeLeads && notInTwenty > 0 && (
-        <Link href="/admin/leads/" className="mb-6 block border border-[#a0661f]/40 bg-[#a0661f]/8 px-4 py-3 text-2xs">
-          <strong className="font-medium">{notInTwenty} lead{notInTwenty === 1 ? "" : "s"} not in Twenty yet</strong> — saved here and retrying automatically. View leads →
-        </Link>
-      )}
+      <section className="mb-10" aria-labelledby="todo-h">
+        <h2 id="todo-h" className="mb-3 text-title">To do</h2>
+        {todos.length === 0 ? (
+          <p className="border border-line bg-white/40 px-4 py-5 text-body">All done. Nothing needs your attention right now. ✓</p>
+        ) : (
+          <ul className="divide-y divide-line border border-line bg-white/40">
+            {todos.map((t) => (
+              <li key={t.id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 gap-3">
+                  <span aria-hidden="true" className={`mt-2 size-2 shrink-0 rounded-full ${KIND[t.kind].dot}`} />
+                  <div className="min-w-0">
+                    <div className="text-body">
+                      <span className="sr-only">{KIND[t.kind].label}: </span>
+                      {t.title}
+                    </div>
+                    {t.detail && <div className="mt-0.5 text-2xs text-muted">{t.detail}</div>}
+                  </div>
+                </div>
+                <Link href={t.href} className={`${t.kind === "now" ? btn.primary : btn.secondary} shrink-0 self-start sm:self-center`}>
+                  {t.action}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
         {stats.map((s) => (
@@ -110,7 +142,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             ))}
           </ul>
         </Card>
-        <Card title="Activity">
+        <Card title="Activity" actions={can(user.role, "users") ? <Link href="/admin/activity/" className="text-2xs underline">See all</Link> : undefined}>
           {activity.length ? (
             <ul className="divide-y divide-line">
               {activity.map((a, i) => (

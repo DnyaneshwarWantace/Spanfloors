@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import AdminNav from "@/components/admin/AdminNav";
 import MobileNav from "@/components/admin/MobileNav";
+import CommandPalette from "@/components/admin/CommandPalette";
+import SearchButton from "@/components/admin/SearchButton";
 import { logout, requireUser } from "@/server/auth";
 
 export const metadata: Metadata = {
@@ -26,6 +28,8 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           <img src="/brand/span-floors-logo.png" alt="Span Floors" width={155} height={82} className="h-9 w-auto" />
           <span className="mono text-2xs text-paper/60">Admin</span>
         </Link>
+
+        <SearchButton />
 
         <Suspense>
           <AdminNav role={user.role} />
@@ -79,6 +83,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       <aside className="hidden flex-col gap-8 bg-ink px-4 py-6 text-paper lg:sticky lg:top-0 lg:flex lg:h-screen lg:overflow-y-auto">{sidebar}</aside>
 
       <div className="min-w-0 overflow-x-clip px-4 pb-24 sm:px-6 lg:px-10">{children}</div>
+      <CommandPalette role={user.role} />
     </div>
   );
 }

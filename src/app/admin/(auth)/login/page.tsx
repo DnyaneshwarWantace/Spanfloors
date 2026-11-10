@@ -12,6 +12,7 @@ async function signIn(formData: FormData) {
   const next = String(formData.get("next") ?? "");
   const result = await login(email, password);
   if ("error" in result) redirect(`/admin/login/?error=${result.error}${next ? `&next=${encodeURIComponent(next)}` : ""}`);
+  if ("twoStep" in result) redirect(`/admin/login/code/${next.startsWith("/admin/") ? `?next=${encodeURIComponent(next)}` : ""}`);
   // Only allow redirects back into the admin.
   redirect(next.startsWith("/admin/") ? next : "/admin/");
 }
@@ -39,6 +40,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </div>
           {error === "locked" ? (
             <Notice tone="error">Too many failed attempts. Sign-in is paused for 15 minutes.</Notice>
+          ) : error === "expired" ? (
+            <Notice tone="error">The sign-in took too long. Enter your email and password again.</Notice>
           ) : (
             error && <Notice tone="error">That email and password don’t match an active account.</Notice>
           )}

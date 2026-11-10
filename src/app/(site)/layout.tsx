@@ -2,6 +2,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import AnnouncementBar from "@/components/AnnouncementBar";
 import Tracking from "@/components/Tracking";
+import AdminBar from "@/components/AdminBar";
 import { getConfig, getTexts, identityUrls } from "@/server/site-config";
 
 /** Dates from the admin without a time zone are India time. */
@@ -26,6 +27,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <Header left={header.left} right={header.right} button={header.button} logo={urls.logo} />
       <main>{children}</main>
       <Footer footer={footer} contact={contact} logo={urls.logoLight} texts={texts} />
+      <AdminBar />
       <Tracking ga4={tracking.ga4} gtm={tracking.gtm} metaPixel={tracking.metaPixel} requireConsent={tracking.requireConsent} banner={cookies} />
     </>
   );

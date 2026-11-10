@@ -84,6 +84,13 @@ export default async function LeadDetail({ params }: { params: Promise<{ id: str
                 Email
               </a>
             )}
+            {lead.status === "new" && (
+              <form action={updateLead}>
+                <input type="hidden" name="id" value={lead.id} />
+                <input type="hidden" name="status" value="contacted" />
+                <button className={btn.primary}>Mark contacted</button>
+              </form>
+            )}
           </>
         }
       />

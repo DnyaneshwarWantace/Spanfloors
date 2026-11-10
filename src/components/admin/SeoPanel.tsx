@@ -122,6 +122,8 @@ export default function SeoPanel({
   const [focusKeyword, setFocusKeyword] = useState(initial.focusKeyword);
   const [noindex, setNoindex] = useState(/noindex/.test(initial.robots));
   const [schemaType, setSchemaType] = useState(initial.schemaType);
+  // Advanced settings stay folded unless one of them is already in use.
+  const advancedOpen = Boolean(initial.canonicalUrl || /noindex/.test(initial.robots) || initial.schemaType);
   const [ogTitle, setOgTitle] = useState(initial.ogTitle);
   const [ogDescription, setOgDescription] = useState(initial.ogDescription);
   const [ogImage, setOgImage] = useState(initial.ogImage);
@@ -169,7 +171,7 @@ export default function SeoPanel({
 
       <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 border border-line bg-white/40 p-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Search (SEO)</h2>
+          <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">How it looks on Google</h2>
           <button type="button" className={`${btn.ghost} h-7 px-0`} onClick={writeWithAi} disabled={ai.busy} title="Suggest a title and description from the page's own text">
             {ai.busy ? "Writing…" : "Write with AI"}
           </button>
@@ -183,33 +185,38 @@ export default function SeoPanel({
           <div className="mt-0.5 line-clamp-1 text-[1.05rem] leading-snug text-[#1a0dab]">{effTitle}</div>
           <div className="mt-0.5 line-clamp-2 text-2xs leading-snug text-[#4d5156]">{effDesc}</div>
         </div>
-        <Field label="Focus keyword" htmlFor="focusKeyword" hint="The phrase people search for, e.g. “engineered wood flooring Delhi”.">
+        <Field label="Main search phrase" htmlFor="focusKeyword" hint="What people type into Google to find this, e.g. “engineered wood flooring Delhi”.">
           <input id="focusKeyword" name="focusKeyword" value={focusKeyword} maxLength={80} onChange={(e) => setFocusKeyword(e.target.value)} className={inputCls} />
         </Field>
-        <Field label="SEO title" htmlFor="seoTitle">
+        <Field label="Title on Google" htmlFor="seoTitle" hint="Leave empty to use the page title.">
           <input id="seoTitle" name="seoTitle" value={seoTitle} maxLength={120} onChange={(e) => setSeoTitle(e.target.value)} placeholder={`${title} - Span Floors`} className={inputCls} />
           <Counter value={seoTitle} ideal={[30, 60]} />
         </Field>
-        <Field label="Meta description" htmlFor="seoDescription">
+        <Field label="Text under the title" htmlFor="seoDescription" hint="One or two sentences that make people click.">
           <textarea id="seoDescription" name="seoDescription" value={seoDescription} maxLength={320} onChange={(e) => setSeoDescription(e.target.value)} rows={3} className={`${inputCls} h-auto py-2`} />
           <Counter value={seoDescription} ideal={[70, 160]} />
         </Field>
-        {type === "page" && (
-          <Field label="Page type for Google" htmlFor="schemaTypeDd">
-            <Dropdown id="schemaTypeDd" aria-label="Page type for Google" value={schemaType} onChange={setSchemaType} options={SCHEMA_TYPES.map((t) => ({ value: t.value, label: t.label, hint: t.hint }))} />
-          </Field>
-        )}
-        <label className="flex items-center gap-2 text-2xs">
-          <input type="checkbox" name="noindex" checked={noindex} onChange={(e) => setNoindex(e.target.checked)} />
-          Hide from search engines (noindex)
-        </label>
-        <Field label="Canonical URL (optional)" htmlFor="canonicalUrl">
-          <input id="canonicalUrl" name="canonicalUrl" defaultValue={initial.canonicalUrl} placeholder="Leave empty for this page’s own URL" className={inputCls} />
-        </Field>
+        <details className="group border-t border-line pt-2" open={advancedOpen}>
+          <summary className="cursor-pointer text-2xs text-muted hover:text-ink">More options{noindex ? " · hidden from Google" : ""}</summary>
+          <div className="mt-3 grid gap-3">
+            {type === "page" && (
+              <Field label="Page type for Google" htmlFor="schemaTypeDd">
+                <Dropdown id="schemaTypeDd" aria-label="Page type for Google" value={schemaType} onChange={setSchemaType} options={SCHEMA_TYPES.map((t) => ({ value: t.value, label: t.label, hint: t.hint }))} />
+              </Field>
+            )}
+            <label className="flex items-center gap-2 text-2xs">
+              <input type="checkbox" name="noindex" checked={noindex} onChange={(e) => setNoindex(e.target.checked)} />
+              Keep this page out of Google
+            </label>
+            <Field label="Main address for Google (optional)" htmlFor="canonicalUrl" hint="Only when the same content lives at another address.">
+              <input id="canonicalUrl" name="canonicalUrl" defaultValue={initial.canonicalUrl} placeholder="Leave empty for this page’s own address" className={inputCls} />
+            </Field>
+          </div>
+        </details>
       </section>
 
       <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 border border-line bg-white/40 p-4">
-        <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Sharing (WhatsApp, Telegram, social)</h2>
+        <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">How it looks when shared</h2>
         <div className="flex flex-wrap gap-1" role="group" aria-label="App">
           {(
             [
@@ -239,30 +246,54 @@ export default function SeoPanel({
           </div>
           <p className="text-2xs text-muted">{ogImage ? "Best at 1200 × 630 pixels." : "Automatic: a branded card with the page title and featured image."}</p>
         </div>
-        <Field label="Share title (optional)" htmlFor="ogTitle">
-          <input id="ogTitle" name="ogTitle" value={ogTitle} maxLength={120} onChange={(e) => setOgTitle(e.target.value)} placeholder={effTitle} className={inputCls} />
-        </Field>
-        <Field label="Share description (optional)" htmlFor="ogDescription">
-          <textarea id="ogDescription" name="ogDescription" value={ogDescription} maxLength={300} onChange={(e) => setOgDescription(e.target.value)} rows={2} placeholder={effDesc} className={`${inputCls} h-auto py-2`} />
-        </Field>
+        <details className="border-t border-line pt-2" open={Boolean(initial.ogTitle || initial.ogDescription)}>
+          <summary className="cursor-pointer text-2xs text-muted hover:text-ink">Use different words when shared</summary>
+          <div className="mt-3 grid gap-3">
+            <Field label="Share title (optional)" htmlFor="ogTitle">
+              <input id="ogTitle" name="ogTitle" value={ogTitle} maxLength={120} onChange={(e) => setOgTitle(e.target.value)} placeholder={effTitle} className={inputCls} />
+            </Field>
+            <Field label="Share description (optional)" htmlFor="ogDescription">
+              <textarea id="ogDescription" name="ogDescription" value={ogDescription} maxLength={300} onChange={(e) => setOgDescription(e.target.value)} rows={2} placeholder={effDesc} className={`${inputCls} h-auto py-2`} />
+            </Field>
+          </div>
+        </details>
       </section>
 
       <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 border border-line bg-white/40 p-4" aria-live="polite">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">SEO checklist</h2>
+          <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Google check</h2>
           {report && <span className={`text-title tabular-nums ${report.score >= 80 ? "text-[#2f6339]" : report.score >= 55 ? "text-[#a0661f]" : "text-brand"}`}>{report.score}</span>}
         </div>
         {!report ? (
           <p className="text-2xs text-muted">Checking…</p>
         ) : (
-          <ul className="grid gap-1.5">
-            {report.checks.map((c) => (
-              <li key={c.id} className="flex gap-2 text-2xs leading-snug">
-                <span aria-hidden="true" className={`mt-1 size-2 shrink-0 rounded-full ${STATUS_DOT[c.status]}`} />
-                <span className={c.status === "good" ? "text-muted" : ""}>{c.text}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            {report.checks.some((c) => c.status !== "good") ? (
+              <ul className="grid gap-1.5">
+                {report.checks.filter((c) => c.status !== "good").map((c) => (
+                  <li key={c.id} className="flex gap-2 text-2xs leading-snug">
+                    <span aria-hidden="true" className={`mt-1 size-2 shrink-0 rounded-full ${STATUS_DOT[c.status]}`} />
+                    <span>{c.text}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-2xs text-[#2f6339]">Ready for Google ✓</p>
+            )}
+            {report.checks.some((c) => c.status === "good") && (
+              <details>
+                <summary className="cursor-pointer text-2xs text-muted hover:text-ink">{report.checks.filter((c) => c.status === "good").length} things are already fine</summary>
+                <ul className="mt-2 grid gap-1.5">
+                  {report.checks.filter((c) => c.status === "good").map((c) => (
+                    <li key={c.id} className="flex gap-2 text-2xs leading-snug text-muted">
+                      <span aria-hidden="true" className={`mt-1 size-2 shrink-0 rounded-full ${STATUS_DOT[c.status]}`} />
+                      <span>{c.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </>
         )}
         <div className="grid gap-2 border-t border-line pt-3">
           <div className="flex flex-wrap items-center gap-2">

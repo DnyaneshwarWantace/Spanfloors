@@ -96,19 +96,150 @@ function suggestPath(title: string, type: "post" | "page") {
 }
 
 
-export default function ContentForm({
-  initial,
-  missingImages = [],
-  canPublish = true,
-  reusable = [],
-  canReuse = false,
-}: {
+type EditorProps = {
   initial: ContentFormData;
   missingImages?: string[];
   canPublish?: boolean;
   reusable?: ReusableItem[];
   canReuse?: boolean;
-}) {
+};
+
+/* ---------- Safety copy in this browser (so a closed tab or a crash never loses work) ---------- */
+
+type Backup = { savedAt: number; fields: Record<string, string> };
+const BACKUP_FIELDS = ["title", "path", "body", "layout", "excerpt", "seoTitle", "seoDescription", "focusKeyword", "ogTitle", "ogDescription", "tags", "aeo", "authorName"];
+const backupKey = (initial: ContentFormData) => `sf-draft:${initial.id ?? `new-${initial.type}`}`;
+
+function readBackup(key: string): Backup | null {
+  try {
+    const raw = localStorage.getItem(key);
+    const b = raw ? (JSON.parse(raw) as Backup) : null;
+    return b && typeof b.savedAt === "number" && b.fields ? b : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeBackup(key: string, form: HTMLFormElement) {
+  try {
+    const fd = new FormData(form);
+    const fields = Object.fromEntries(BACKUP_FIELDS.filter((k) => fd.has(k)).map((k) => [k, String(fd.get(k) ?? "")]));
+    localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), fields } satisfies Backup));
+  } catch {}
+}
+
+function clearBackup(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {}
+}
+
+/** The saved copy laid over what the server sent. */
+function applyBackup(initial: ContentFormData, f: Record<string, string>): ContentFormData {
+  const json = <T,>(v: string | undefined, fallback: T): T => {
+    try {
+      return v ? (JSON.parse(v) as T) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  return {
+    ...initial,
+    title: f.title ?? initial.title,
+    path: f.path || initial.path,
+    body: f.body ?? initial.body,
+    layout: json<Section[]>(f.layout, initial.layout),
+    excerpt: f.excerpt ?? initial.excerpt,
+    seoTitle: f.seoTitle ?? initial.seoTitle,
+    seoDescription: f.seoDescription ?? initial.seoDescription,
+    focusKeyword: f.focusKeyword ?? initial.focusKeyword,
+    ogTitle: f.ogTitle ?? initial.ogTitle,
+    ogDescription: f.ogDescription ?? initial.ogDescription,
+    tags: f.tags != null ? f.tags.split(",").map((t) => t.trim()).filter(Boolean) : initial.tags,
+    aeo: f.aeo ? cleanAeo(json(f.aeo, {})) : initial.aeo,
+    authorName: f.authorName != null ? f.authorName || null : initial.authorName,
+  };
+}
+
+/**
+ * The page and post editor. Wraps the form with a safety copy: while you edit, a copy is kept in this
+ * browser; if the tab closed before saving, reopening the page offers to bring the changes back.
+ */
+export default function ContentForm(props: EditorProps) {
+  const key = backupKey(props.initial);
+  const [found, setFound] = useState<Backup | null>(null);
+  const [initial, setInitial] = useState(props.initial);
+  const [round, setRound] = useState(0);
+  useEffect(() => {
+    // A new page or post that was just created: its "new" copy is now saved for real.
+    if (props.initial.id && new URLSearchParams(window.location.search).has("created")) clearBackup(`sf-draft:new-${props.initial.type}`);
+    const b = readBackup(key);
+    const serverTime = props.initial.updatedAt ? new Date(props.initial.updatedAt).getTime() : 0;
+    // Only offer a copy made after the last save, and only if it differs from what is saved.
+    if (b && b.savedAt > serverTime && BACKUP_FIELDS.some((k) => k in b.fields && b.fields[k] !== fieldOf(props.initial, k))) setFound(b);
+    else if (b) clearBackup(key);
+  }, [key, props.initial]);
+
+  return (
+    <>
+      {found && (
+        <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 border border-[#a0661f]/50 bg-[#a0661f]/10 px-4 py-3 text-2xs">
+          <span>
+            <strong className="font-medium">Unsaved changes found</strong> from {new Date(found.savedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} on this computer. Bring them back?
+          </span>
+          <span className="flex gap-2">
+            <button
+              type="button"
+              className={btn.primary}
+              onClick={() => {
+                setInitial(applyBackup(props.initial, found.fields));
+                setRound((r) => r + 1);
+                setFound(null);
+              }}
+            >
+              Restore my changes
+            </button>
+            <button
+              type="button"
+              className={btn.ghost}
+              onClick={() => {
+                clearBackup(key);
+                setFound(null);
+              }}
+            >
+              Discard
+            </button>
+          </span>
+        </div>
+      )}
+      <Editor key={round} {...props} initial={initial} backup={key} restored={round > 0} />
+    </>
+  );
+}
+
+/** A field's value as the form would send it, to tell whether a safety copy differs. */
+function fieldOf(c: ContentFormData, k: string): string {
+  switch (k) {
+    case "layout":
+      return JSON.stringify(c.layout);
+    case "tags":
+      return c.tags.join(", ");
+    case "aeo":
+      return JSON.stringify(c.aeo ?? {});
+    default:
+      return String((c as Record<string, unknown>)[k] ?? "");
+  }
+}
+
+function Editor({
+  initial,
+  missingImages = [],
+  canPublish = true,
+  reusable = [],
+  canReuse = false,
+  backup,
+  restored = false,
+}: EditorProps & { backup: string; restored?: boolean }) {
   const [state, action, pending] = useActionState<SaveState, FormData>(saveContent, {});
   const isPage = initial.type === "page";
   // Imported pages keep their old body until it is turned into sections.
@@ -116,14 +247,28 @@ export default function ContentForm({
   const [layout, setLayout] = useState<Section[]>(initial.layout);
   const [layoutKey, setLayoutKey] = useState(0);
   const [showExtra, setShowExtra] = useState(!isPage && initial.layout.length > 0);
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirty] = useState(restored);
   // Bumped on every change so the SEO checklist re-runs.
   const [changeTick, setChangeTick] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
   useUnsavedWarning(dirty);
   useEffect(() => {
-    if (state.ok) setDirty(false);
-  }, [state]);
+    if (state.ok) {
+      setDirty(false);
+      clearBackup(backup);
+    }
+  }, [state, backup]);
+  // Keep a safety copy in this browser every few seconds while there are unsaved changes.
+  useEffect(() => {
+    if (!dirty) return;
+    const t = setInterval(() => formRef.current && writeBackup(backup, formRef.current), 4000);
+    const now = () => formRef.current && writeBackup(backup, formRef.current);
+    window.addEventListener("pagehide", now);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("pagehide", now);
+    };
+  }, [dirty, backup]);
 
   // Preview of the current (unsaved) state.
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -278,7 +423,7 @@ export default function ContentForm({
               setPath(e.target.value);
             }}
             className={`${inputCls} h-8 w-auto min-w-0 flex-1 font-mono text-2xs ${initial.systemKey ? "bg-paper-2 text-muted" : ""}`}
-            aria-label="URL path"
+            aria-label="Web address"
           />
         </div>
 
@@ -387,7 +532,7 @@ export default function ContentForm({
         {initial.id && <VersionHistory contentId={initial.id} type={initial.type} />}
 
         <section className="min-w-0 border border-line bg-white/40 p-4">
-          <h2 className="mb-3 text-2xs font-semibold tracking-[0.06em] uppercase">Featured image</h2>
+          <h2 className="mb-3 text-2xs font-semibold tracking-[0.06em] uppercase">Main photo</h2>
           {featured ? (
             <div className="grid gap-2">
               <div className="relative aspect-[16/10] overflow-hidden bg-paper-2">
@@ -417,11 +562,11 @@ export default function ContentForm({
 
         <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 border border-line bg-white/40 p-4">
           <h2 className="text-2xs font-semibold tracking-[0.06em] uppercase">Summary</h2>
-          <Field label="Excerpt" htmlFor="excerpt" hint="Shown on blog listings. Leave empty to use the first lines.">
+          <Field label="Short summary" htmlFor="excerpt" hint="Shown on blog listings. Leave empty to use the first lines.">
             <textarea id="excerpt" name="excerpt" value={excerpt} onChange={(e) => setExcerpt(e.target.value)} rows={3} className={`${inputCls} h-auto py-2`} />
           </Field>
           {initial.type === "post" && (
-            <Field label="Tags" htmlFor="tags" hint="Comma separated, e.g. Guides, Engineered wood">
+            <Field label="Topics (tags)" htmlFor="tags" hint="Comma separated, e.g. Guides, Engineered wood">
               <input id="tags" name="tags" defaultValue={initial.tags.join(", ")} className={inputCls} />
             </Field>
           )}
@@ -475,7 +620,7 @@ export default function ContentForm({
         <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-6" onClick={() => setPicking(false)}>
           <div className="max-h-[85vh] w-full max-w-5xl overflow-y-auto bg-paper p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="mono text-title">Featured image</h2>
+              <h2 className="mono text-title">Main photo</h2>
               <button type="button" className={btn.ghost} onClick={() => setPicking(false)}>
                 Close
               </button>

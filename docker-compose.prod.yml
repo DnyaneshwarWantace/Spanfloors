@@ -24,6 +24,8 @@ services:
     volumes:
       # uploaded + imported media (persists across deploys)
       - ./storage:/app/storage
+      # nightly database dumps, read-only: listed in Admin → Backups
+      - ./backups:/app/backups:ro
     depends_on:
       db:
         condition: service_healthy

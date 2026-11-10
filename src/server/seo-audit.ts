@@ -1,5 +1,6 @@
 import "server-only";
 import { existsSync } from "node:fs";
+import { unstable_cache } from "next/cache";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { CATEGORIES, getFullCatalog } from "@/lib/catalog";
@@ -140,3 +141,38 @@ export async function notFoundList(includeIgnored = false) {
     .orderBy(sql`${schema.notFoundLog.hits} desc, ${schema.notFoundLog.lastSeen} desc`)
     .limit(300);
 }
+
+/**
+ * Website health numbers for the dashboard. Checking every page takes a few seconds, so the result is kept
+ * for 10 minutes (and refreshed sooner when content changes).
+ */
+export const siteHealth = unstable_cache(
+  async () => {
+    const [overview, broken, [photos], [missing]] = await Promise.all([
+      seoOverview(),
+      scanBrokenLinks(),
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(schema.media)
+        .where(and(sql`${schema.media.mime} like 'image/%'`, eq(schema.media.placeholder, false), sql`trim(${schema.media.alt}) = ''`)),
+      db
+        .select({ n: sql<number>`count(*)::int`, hits: sql<number>`coalesce(sum(${schema.notFoundLog.hits}), 0)::int` })
+        .from(schema.notFoundLog)
+        .where(and(eq(schema.notFoundLog.ignored, false), sql`${schema.notFoundLog.lastSeen} > now() - interval '7 days'`)),
+    ]);
+    const scores = overview.map((o) => o.report.score);
+    return {
+      pages: overview.length,
+      seoAverage: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
+      seoWeak: scores.filter((s) => s < 60).length,
+      brokenLinks: broken.filter((b) => b.problem === "missing").length,
+      linksViaRedirect: broken.filter((b) => b.problem === "redirect").length,
+      photosWithoutDescription: photos.n,
+      notFound7d: missing.n,
+      notFoundHits7d: missing.hits,
+      checkedAt: new Date().toISOString(),
+    };
+  },
+  ["site-health"],
+  { tags: ["content", "media"], revalidate: 600 },
+);

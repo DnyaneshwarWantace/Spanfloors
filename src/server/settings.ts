@@ -30,7 +30,7 @@ export const SETTING_DEFS = {
     label: "If the API returns JSON: path to the image URL (e.g. data.url)",
     secret: false,
   },
-  "allsy.apiUrl": { group: "integrations", label: "Allsy.io API base URL (e.g. https://api.allsy.io/v1)", secret: false },
+  "allsy.apiUrl": { group: "integrations", label: "Allsy.io Content API address", secret: false, default: "https://allsy.fly.dev/api/content/v1" },
   "allsy.apiKey": { group: "integrations", label: "Allsy.io API key (for pulling media)", secret: true },
   "allsy.webhookSecret": { group: "integrations", label: "Allsy.io push secret (shared with Allsy.io to sign pushes)", secret: true },
   "email.smtpHost": { group: "integrations", label: "SMTP host (enquiry emails)", secret: false },

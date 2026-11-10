@@ -44,7 +44,7 @@ async function updateUser(form: FormData) {
   const me = await requireUser("users");
   const id = String(form.get("id"));
   const op = String(form.get("op"));
-  if (id === me.id && op !== "reset") redirect("/admin/users/?error=self");
+  if (id === me.id && op !== "reset" && op !== "twostep") redirect("/admin/users/?error=self");
   const [u] = await db.select().from(schema.users).where(eq(schema.users.id, id));
   if (!u) redirect("/admin/users/");
   if (op === "role") {
@@ -62,6 +62,11 @@ async function updateUser(form: FormData) {
     await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
     await logActivity(me.id, "update", "user", id, `Reset password for ${u.email}`);
     await flashPassword(u.email, temp, true);
+  } else if (op === "twostep" && u.totpEnabled) {
+    // For someone who lost their phone and their recovery codes; they can set it up again from Account.
+    await db.update(schema.users).set({ totpEnabled: false, totpSecret: null, recoveryCodes: [], updatedAt: new Date() }).where(eq(schema.users.id, id));
+    await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+    await logActivity(me.id, "update", "user", id, `Turned off two-step sign-in for ${u.email}`);
   }
   redirect("/admin/users/");
 }
@@ -148,7 +153,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                     </form>
                   )}
                 </td>
-                <td className="px-4 py-3">{u.active ? "Active" : <span className="text-muted">Deactivated</span>}</td>
+                <td className="px-4 py-3">
+                  {u.active ? "Active" : <span className="text-muted">Deactivated</span>}
+                  {u.totpEnabled && <div className="text-muted">Two-step on</div>}
+                </td>
                 <td className="px-4 py-3 text-muted">{formatDate(u.lastLoginAt, true)}</td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1">
@@ -160,6 +168,13 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                           <button className={btn.ghost}>{u.active ? "Deactivate" : "Reactivate"}</button>
                         </form>
                       </>
+                    )}
+                    {u.totpEnabled && (
+                      <form action={updateUser}>
+                        <input type="hidden" name="id" value={u.id} />
+                        <input type="hidden" name="op" value="twostep" />
+                        <button className={btn.ghost} title="Use when they lost their phone and recovery codes">Turn off two-step</button>
+                      </form>
                     )}
                     <form action={updateUser}>
                       <input type="hidden" name="id" value={u.id} />

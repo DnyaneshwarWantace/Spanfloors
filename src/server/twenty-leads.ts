@@ -5,6 +5,7 @@ import type { Lead } from "@/db/schema";
 import { getFullCatalog } from "@/lib/catalog";
 import { SITE_URL } from "@/lib/seo";
 import { getSettings } from "./settings";
+import { logIntegration } from "./integration-log";
 
 /**
  * ⚠️ The ONLY place in the codebase that writes to Twenty CRM (see CLAUDE.md).
@@ -186,12 +187,14 @@ export async function pushLead(leadId: string): Promise<"sent" | "failed" | "off
       .update(schema.leads)
       .set({ twentyStatus: "sent", twentyError: null, twentySyncedAt: new Date(), twentyAttempts: lead.twentyAttempts + 1 })
       .where(eq(schema.leads.id, leadId));
+    await logIntegration("twenty", "create lead", true, `Lead “${lead.name}” copied to Twenty`);
     return "sent";
   } catch (e) {
     await db
       .update(schema.leads)
       .set({ twentyStatus: "failed", twentyError: (e instanceof Error ? e.message : String(e)).slice(0, 500), twentyAttempts: lead.twentyAttempts + 1 })
       .where(eq(schema.leads.id, leadId));
+    await logIntegration("twenty", "create lead", false, `Lead “${lead.name}”: ${e instanceof Error ? e.message : String(e)}`);
     return "failed";
   }
 }

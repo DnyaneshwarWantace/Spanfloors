@@ -48,14 +48,14 @@ function Thumb({ m }: { m: MediaItem }) {
 /**
  * Media library grid. In "picker" mode clicking an item calls onPick instead of opening details.
  */
-export default function MediaLibrary({ picker = false, onPick, initialKind = "all" }: { picker?: boolean; onPick?: (m: MediaItem) => void; initialKind?: Kind }) {
+export default function MediaLibrary({ picker = false, onPick, initialKind = "all", initialQuery = "", initialFilter = "all" }: { picker?: boolean; onPick?: (m: MediaItem) => void; initialKind?: Kind; initialQuery?: string; initialFilter?: MediaFilter }) {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery);
   const [kind, setKind] = useState<Kind>(initialKind);
   const [folder, setFolder] = useState<string>(ALL);
-  const [filter, setFilter] = useState<MediaFilter>("all");
+  const [filter, setFilter] = useState<MediaFilter>(initialFilter);
   const [folders, setFolders] = useState<{ folder: string; n: number }[]>([]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [selecting, setSelecting] = useState(false);

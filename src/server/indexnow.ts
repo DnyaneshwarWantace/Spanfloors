@@ -1,4 +1,5 @@
 import "server-only";
+import { logIntegration } from "./integration-log";
 import { randomBytes } from "node:crypto";
 import { SITE_URL } from "@/lib/seo";
 import { NOINDEX_SITE } from "./metadata";
@@ -30,9 +31,12 @@ export function pingIndexNow(paths: string[]) {
         body: JSON.stringify({ host, key, keyLocation: `${SITE_URL}/indexnow-key.txt`, urlList: [...new Set(paths)].slice(0, 100).map((p) => `${SITE_URL}${p}`) }),
         signal: AbortSignal.timeout(10_000),
       });
-      if (!res.ok && res.status !== 202) console.warn(`[indexnow] ${res.status} for ${paths.join(", ")}`);
+      const ok = res.ok || res.status === 202;
+      if (!ok) console.warn(`[indexnow] ${res.status} for ${paths.join(", ")}`);
+      await logIntegration("indexnow", "ping", ok, `${paths.slice(0, 3).join(", ")}${paths.length > 3 ? ` +${paths.length - 3}` : ""}${ok ? "" : ` (${res.status})`}`);
     } catch (e) {
       console.warn("[indexnow] ping failed:", (e as Error).message);
+      await logIntegration("indexnow", "ping", false, (e as Error).message);
     }
   })();
 }

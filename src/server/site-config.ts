@@ -1,3 +1,4 @@
+import { fieldModes, FORM_FIELDS, FORM_LABELS, NEEDS_CONTACT, type FieldMode, type FormKey } from "@/lib/form-fields";
 import "server-only";
 import { cache } from "react";
 import { inArray } from "drizzle-orm";
@@ -87,6 +88,8 @@ export const CONFIG = {
     copyright: z.string().trim().max(120).default("© {year} Span Floors. All rights reserved."),
   }),
   "config.texts": z.record(z.string(), z.string().max(300)).default({}),
+  /** Per website form: extra fields set to optional, required or hidden (see lib/form-fields). */
+  "config.forms": z.record(z.string(), z.record(z.string(), z.enum(["optional", "required", "hidden"]))).default({}),
 } as const;
 
 export type ConfigKey = keyof typeof CONFIG;
@@ -134,6 +137,7 @@ const DEFAULTS: { [K in ConfigKey]: Config<K> } = {
     copyright: "© {year} Span Floors. All rights reserved.",
   },
   "config.texts": {},
+  "config.forms": {},
 };
 
 /** Words used on many pages. Editors change them in Admin → Shared texts; these are the defaults. */
@@ -225,6 +229,18 @@ export function validateConfig<K extends ConfigKey>(key: K, value: unknown): { o
   if (key === "config.texts") {
     const t = v as Record<string, string>;
     v = Object.fromEntries(Object.entries(t).filter(([k, x]) => k in TEXT_DEFAULTS && x.trim())) as Config<K>;
+  }
+  if (key === "config.forms") {
+    const f = v as Config<"config.forms">;
+    const out: Record<string, Record<string, FieldMode>> = {};
+    for (const form of Object.keys(FORM_FIELDS) as FormKey[]) {
+      if (!f[form]) continue;
+      if (NEEDS_CONTACT.includes(form) && f[form].phone === "hidden" && f[form].email === "hidden") {
+        return { ok: false, error: `${FORM_LABELS[form]}: keep phone or email visible so the team can reply.` };
+      }
+      out[form] = fieldModes(f, form);
+    }
+    v = out as Config<K>;
   }
   return { ok: true, value: v };
 }

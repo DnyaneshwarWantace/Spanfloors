@@ -24,8 +24,8 @@ export default function AeoPanel({ initial, type }: { initial: Aeo; type: "post"
       <input type="hidden" name="aeo" value={value} />
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex items-center justify-between text-left">
         <span>
-          <span className="block text-2xs font-semibold tracking-[0.06em] uppercase">Answer engines (Google, ChatGPT, Perplexity)</span>
-          <span className="block text-2xs text-muted">A short answer, key points and questions. AI search quotes these.</span>
+          <span className="block text-2xs font-semibold tracking-[0.06em] uppercase">Google & AI answers</span>
+          <span className="block text-2xs text-muted">Optional: a short answer, key points and questions that Google, ChatGPT and others can quote.</span>
         </span>
         <span className="text-2xs text-muted">{open ? "Hide" : "Show"}</span>
       </button>

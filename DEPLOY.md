@@ -61,7 +61,7 @@ Database migrations run automatically on start.
 
 ## 7. Backups
 
-Nightly dumps land in `./backups/` on the server (14 days kept). Restore:
+Nightly dumps land in `./backups/` on the server (14 days kept). The app sees that folder read-only and lists it in Admin → Backups, with a warning if the newest is over 36 hours old. Media files (`./storage`) are not in these dumps; copy them separately. Restore:
 
 ```bash
 gunzip -c backups/spanfloors-YYYY-MM-DD.sql.gz | docker compose -f docker-compose.prod.yml exec -T db psql -U spanfloors -d spanfloors

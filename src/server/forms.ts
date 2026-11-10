@@ -10,6 +10,8 @@ import { rateLimit } from "./rate-limit";
 import { getSettings } from "./settings";
 import { pushLead, retryPendingLeads } from "./twenty-leads";
 import { SITE_URL } from "@/lib/seo";
+import { FIELD_LABELS, fieldModes } from "@/lib/form-fields";
+import { getConfig } from "./site-config";
 
 export const LEAD_TYPES = ["enquiry", "sample", "download", "dealer", "video_call", "visit", "landing"] as const;
 export type LeadType = (typeof LEAD_TYPES)[number];
@@ -120,6 +122,17 @@ export async function submitLead(type: LeadType, input: Record<string, unknown>,
 
   const turnstile = await verifyTurnstile(input["cf-turnstile-response"], meta.ip);
   if (turnstile === false) return { ok: false, status: 400, error: "Please complete the verification and try again." };
+
+  // Admin → Forms: hidden fields are dropped, required ones must be filled.
+  const modes = type === "landing" ? {} : fieldModes(await getConfig("config.forms"), type);
+  input = { ...input };
+  const missing: Record<string, string> = {};
+  for (const [f, mode] of Object.entries(modes)) {
+    const val = input[f];
+    if (mode === "hidden") delete input[f];
+    else if (mode === "required" && (val == null || String(val).trim() === "")) missing[f] = `Enter your ${FIELD_LABELS[f]?.toLowerCase() ?? f}`;
+  }
+  if (Object.keys(missing).length) return { ok: false, status: 422, error: "Please check the highlighted fields.", fields: missing };
 
   const parsed = SCHEMAS[type].safeParse(input);
   if (!parsed.success) {
@@ -235,7 +248,7 @@ async function notify(id: string) {
       html: `<table cellpadding="6" style="font-family:Arial,sans-serif;font-size:14px;border-collapse:collapse">${rows
         .map(([k, val]) => `<tr><td style="color:#777;vertical-align:top">${escapeHtml(k)}</td><td>${escapeHtml(String(val)).replace(/\n/g, "<br>")}</td></tr>`)
         .join("")}</table><p><a href="${adminUrl}">Open in admin</a></p>`,
-    });
+    }, "lead email");
   }
 
   const { "forms.autoReply": autoReply } = await getSettings(["forms.autoReply"]);
@@ -252,7 +265,7 @@ async function notify(id: string) {
       to: lead.email,
       subject: "Span Floors: we’ve received your request",
       text: `Hello ${lead.name},\n\n${what.charAt(0).toUpperCase()}${what.slice(1)}\n\nSpan Floors`,
-    });
+    }, "auto-reply");
   }
   if (sent) await db.update(schema.leads).set({ emailedAt: new Date() }).where(eq(schema.leads.id, id));
 }

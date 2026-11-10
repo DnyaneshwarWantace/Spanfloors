@@ -2,11 +2,12 @@ import SettingsForm from "@/components/admin/SettingsForm";
 import { PageHeader } from "@/components/admin/ui";
 import { requireUser } from "@/server/auth";
 import { settingsForAdmin } from "@/server/settings";
+import IntegrationTests from "@/components/admin/IntegrationTests";
 
 export const dynamic = "force-dynamic";
 
 export default async function IntegrationsPage() {
-  await requireUser("settings.integrations");
+  const user = await requireUser("settings.integrations");
   const rows = (await settingsForAdmin()).filter((r) => r.group === "integrations");
   return (
     <>
@@ -17,7 +18,6 @@ export default async function IntegrationsPage() {
       <SettingsForm
         group="integrations"
         rows={rows}
-        showTwentyTest
         sections={[
           {
             title: "Twenty CRM (products)",
@@ -40,6 +40,7 @@ export default async function IntegrationsPage() {
           { title: "Email (enquiry & sample forms)", keys: ["email.enquiryTo", "email.smtpHost", "email.smtpUser", "email.smtpPassword"] },
         ]}
       />
+      <IntegrationTests email={user.email} />
     </>
   );
 }

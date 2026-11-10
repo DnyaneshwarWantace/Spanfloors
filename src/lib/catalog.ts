@@ -135,7 +135,8 @@ export const getFullCatalog = cache(async (): Promise<CatalogProduct[]> => {
     const fromHost =
       cfg.mode === "allsy"
         ? [
-            ...external.map((id) => allsy.byId.get(id)),
+            // The Allsy ID the client puts on the product in Twenty → that exact Allsy photo (shown from Allsy, never stored here).
+            ...external.map((id) => (/^[0-9a-f-]{36}$/i.test(id) ? `/allsy-image/${id}/` : allsy.byId.get(id))),
             ...(o?.useExternalImages === false ? [] : (allsy.byProduct.get(p.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder).map((x) => x.url)),
           ]
         : external.map((id) => externalImageUrl(id, cfg));

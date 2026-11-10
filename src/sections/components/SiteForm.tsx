@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import Dropdown from "@/components/ui/Dropdown";
+import { fieldModes, type FormsConfig } from "@/lib/form-fields";
 
 /**
  * The website's forms (enquiry, samples, brochure download, dealer, video call, studio visit). Posts to
@@ -104,7 +105,10 @@ export default function SiteForm({
   downloadUrl,
   compact = false,
   texts = {},
+  formsConfig,
 }: {
+  /** Admin → Forms: which extra fields are shown and required. */
+  formsConfig?: FormsConfig;
   /** Words from Admin → Shared texts (form.submit.*, form.done.*, form.privacy, form.error). */
   texts?: FormTexts;
   type: FormType;
@@ -148,6 +152,10 @@ export default function SiteForm({
   );
 
   const fields = type;
+  const modes = fieldModes(formsConfig, type);
+  /** Shown? (fields the admin can't change are always shown) */
+  const on = (f: string) => modes[f] !== "hidden";
+  const req = (f: string, fixed = false) => fixed || modes[f] === "required";
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -160,6 +168,7 @@ export default function SiteForm({
     setError("");
     const website = (new FormData(e.currentTarget).get("website") as string) ?? "";
     const body: Record<string, unknown> = { ...values, website, _t: token, consent: true };
+    for (const [f, m] of Object.entries(modes)) if (m === "hidden") delete body[f];
     if (type === "sample") body.productIds = picked;
     if (type === "download" && downloadId) body.downloadId = downloadId;
     if (type === "dealer" && values.yearsInBusiness === "") delete body.yearsInBusiness;
@@ -201,17 +210,17 @@ export default function SiteForm({
 
       {field("name", "Name", { required: true, auto: "name" })}
       {fields === "dealer" && field("company", "Company", { required: true, auto: "organization" })}
-      {field("phone", "Phone", { type: "tel", required: ["sample", "dealer"].includes(type), auto: "tel", placeholder: "+91" })}
-      {field("email", "Email", { type: "email", required: ["download", "dealer"].includes(type), auto: "email" })}
+      {on("phone") && field("phone", "Phone", { type: "tel", required: req("phone", ["sample", "dealer"].includes(type)), auto: "tel", placeholder: "+91" })}
+      {on("email") && field("email", "Email", { type: "email", required: req("email", ["download", "dealer"].includes(type)), auto: "email" })}
 
-      {(fields === "enquiry" || fields === "video_call" || fields === "visit") && (
-        <F label="I am a" name="profession">
+      {"profession" in modes && on("profession") && (
+        <F label={`I am a${req("profession") ? "" : " (optional)"}`} name="profession" error={errors.profession}>
           <Dropdown id="f-profession" options={PROFESSIONS} value={values.profession} onChange={(v) => setValues((s) => ({ ...s, profession: v }))} aria-label="I am a" />
         </F>
       )}
-      {(fields === "enquiry" || fields === "dealer") && field("city", "City", { auto: "address-level2" })}
-      {fields === "dealer" && field("gstin", "GSTIN")}
-      {fields === "dealer" && field("yearsInBusiness", "Years in business", { type: "number" })}
+      {"city" in modes && on("city") && field("city", "City", { required: req("city"), auto: "address-level2" })}
+      {"gstin" in modes && on("gstin") && field("gstin", "GSTIN", { required: req("gstin") })}
+      {"yearsInBusiness" in modes && on("yearsInBusiness") && field("yearsInBusiness", "Years in business", { type: "number", required: req("yearsInBusiness") })}
 
       {fields === "sample" && (
         <>
@@ -241,9 +250,9 @@ export default function SiteForm({
         </F>
       )}
 
-      {fields !== "download" && (
-        <F label="Message (optional)" name="message" wide>
-          <textarea id="f-message" name="message" rows={3} value={values.message ?? ""} onChange={set("message")} className={`${input} h-auto py-2`} />
+      {"message" in modes && on("message") && (
+        <F label={`Message${req("message") ? "" : " (optional)"}`} name="message" error={errors.message} wide>
+          <textarea id="f-message" name="message" rows={3} required={req("message")} value={values.message ?? ""} onChange={set("message")} className={`${input} h-auto py-2`} />
         </F>
       )}
 

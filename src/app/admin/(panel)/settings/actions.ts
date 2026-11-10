@@ -1,5 +1,7 @@
 "use server";
 
+import { logIntegration } from "@/server/integration-log";
+import { sendMail, verifySmtp } from "@/server/mailer";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { logActivity, requireUser } from "@/server/auth";
 import { saveSettings, SETTING_DEFS, type SettingKey } from "@/server/settings";
@@ -53,20 +55,68 @@ export async function saveSettingsGroup(_prev: SettingsState, form: FormData): P
 
 /** Read-only connection check: one GET to Twenty with the saved key. */
 export async function testTwentyConnection(): Promise<SettingsState> {
-  await requireUser("settings.integrations");
+  const user = await requireUser("settings.integrations");
   const { getSettings } = await import("@/server/settings");
   const cfg = await getSettings(["twenty.apiUrl", "twenty.apiKey"]);
   if (!cfg["twenty.apiKey"]) return { error: "No Twenty API key saved." };
+  let result: SettingsState;
   try {
+    // Read-only check (GET one product).
     const res = await fetch(`${cfg["twenty.apiUrl"] ?? "https://api.twenty.com"}/rest/masterProducts?limit=1`, {
       method: "GET",
       headers: { Authorization: `Bearer ${cfg["twenty.apiKey"]}` },
       cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
     });
-    if (!res.ok) return { error: `Twenty answered ${res.status}. Check the URL and key.` };
-    const j = (await res.json()) as { totalCount?: number };
-    return { ok: true, tested: `Connected. ${j.totalCount ?? "?"} products in Twenty.` };
+    if (!res.ok) result = { error: `Twenty answered ${res.status}. Check the URL and key.` };
+    else {
+      const j = (await res.json()) as { totalCount?: number };
+      result = { ok: true, tested: `Connected. ${j.totalCount ?? "?"} products in Twenty.` };
+    }
   } catch (e) {
-    return { error: `Couldn’t reach Twenty: ${e instanceof Error ? e.message : e}` };
+    result = { error: `Couldn’t reach Twenty: ${e instanceof Error ? e.message : e}` };
   }
+  await logIntegration("twenty", "test", !result.error, result.error ?? result.tested ?? "", user.id);
+  return result;
 }
+
+/** Checks the SMTP login, then sends a short test email to the address given (default: the admin's own). */
+export async function testEmail(to: string): Promise<SettingsState> {
+  const user = await requireUser("settings.integrations");
+  const address = (to || user.email).trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return { error: "Enter a valid email address." };
+  const check = await verifySmtp();
+  if (!check.ok) {
+    await logIntegration("email", "test", false, check.message, user.id);
+    return { error: check.message };
+  }
+  const sent = await sendMail(
+    { to: address, subject: "Span Floors website: test email", text: `This is a test from the website admin (sent by ${user.name}). If you can read it, website emails are working.` },
+    "test",
+  );
+  return sent ? { ok: true, tested: `Test email sent to ${address}. Check the inbox (and spam folder).` } : { error: "The mail server accepted the login but the email couldn’t be sent. See the integration log." };
+}
+
+/** Checks the Allsy.io address and key answer (read-only). */
+export async function testAllsy(): Promise<SettingsState> {
+  const user = await requireUser("settings.integrations");
+  const { getSettings } = await import("@/server/settings");
+  const cfg = await getSettings(["allsy.apiUrl", "allsy.apiKey"]);
+  const base = (cfg["allsy.apiUrl"] || "https://allsy.fly.dev/api/content/v1").replace(/\/$/, "");
+  if (!cfg["allsy.apiKey"]) return { error: "Add the Allsy.io API key first." };
+  let result: SettingsState;
+  try {
+    const res = await fetch(`${base}/images?limit=1`, { method: "GET", headers: { Authorization: `Bearer ${cfg["allsy.apiKey"]}`, Accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    if (res.status === 401 || res.status === 403) result = { error: `Allsy.io refused the key (${res.status}).` };
+    else if (!res.ok) result = { error: `Allsy.io answered ${res.status}.` };
+    else {
+      const j = (await res.json()) as { pagination?: { total?: number } };
+      result = { ok: true, tested: `Connected. ${j.pagination?.total ?? "?"} photos in Allsy.io.` };
+    }
+  } catch (e) {
+    result = { error: `Couldn’t reach Allsy.io: ${e instanceof Error ? e.message : e}` };
+  }
+  await logIntegration("allsy", "test", !result.error, result.error ?? result.tested ?? "", user.id);
+  return result;
+}
+

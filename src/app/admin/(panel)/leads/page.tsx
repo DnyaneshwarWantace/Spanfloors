@@ -6,7 +6,7 @@ import { requireUser } from "@/server/auth";
 import { LEAD_LABELS, type LeadType } from "@/server/forms";
 import { Badge, btn, EmptyState, formatDate, inputCls, PageHeader } from "@/components/admin/ui";
 import { leadRows, leadWhere } from "./query";
-import { retryTwenty } from "./actions";
+import { retryTwenty, updateLead } from "./actions";
 import { inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -117,7 +117,53 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       {rows.length === 0 ? (
         <EmptyState title="No leads match these filters.">New website enquiries appear here as soon as they’re submitted.</EmptyState>
       ) : (
-        <div className="overflow-x-auto border border-line">
+        <>
+        {/* Phones: one card per lead with the actions people use most. */}
+        <ul className="grid gap-2 md:hidden">
+          {rows.map((r) => {
+            const digits = r.phone?.replace(/\D/g, "") ?? "";
+            const wa = digits ? (digits.length === 10 ? `91${digits}` : digits) : null;
+            return (
+              <li key={r.id} className={`grid gap-2.5 border bg-white/40 p-3.5 ${r.status === "new" ? "border-ink" : "border-line"}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <Link href={`/admin/leads/${r.id}/`} className="min-w-0">
+                    <div className="truncate text-body font-medium">{r.name}</div>
+                    <div className="text-2xs text-muted">
+                      {LEAD_LABELS[r.type as LeadType]} · {formatDate(r.createdAt, true)}
+                    </div>
+                    {(r.city || r.slotStart) && <div className="text-2xs text-muted">{[r.city, r.slotStart && `Booked ${formatDate(r.slotStart, true)}`].filter(Boolean).join(" · ")}</div>}
+                  </Link>
+                  <Badge value={STATUS_TONE[r.status]} label={r.status} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {r.phone && (
+                    <a href={`tel:${r.phone}`} className={`${btn.secondary} flex-1`}>
+                      Call
+                    </a>
+                  )}
+                  {wa && (
+                    <a href={`https://wa.me/${wa}?text=${encodeURIComponent(`Hello ${r.name}, this is Span Floors regarding your ${LEAD_LABELS[r.type as LeadType].toLowerCase()}.`)}`} target="_blank" rel="noopener" className={`${btn.secondary} flex-1`}>
+                      WhatsApp
+                    </a>
+                  )}
+                  {!r.phone && r.email && (
+                    <a href={`mailto:${r.email}`} className={`${btn.secondary} flex-1`}>
+                      Email
+                    </a>
+                  )}
+                  {r.status === "new" && (
+                    <form action={updateLead} className="flex flex-1">
+                      <input type="hidden" name="id" value={r.id} />
+                      <input type="hidden" name="status" value="contacted" />
+                      <button className={`${btn.primary} w-full`}>Mark contacted</button>
+                    </form>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden overflow-x-auto border border-line md:block">
           <table className="w-full min-w-[60rem] text-left text-2xs">
             <thead className="bg-paper-2">
               <tr>
@@ -162,6 +208,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {pages > 1 && (

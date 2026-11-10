@@ -15,12 +15,13 @@ const LABELS: Record<ConfigKey, string> = {
   "config.header": "header menu",
   "config.footer": "footer menu",
   "config.texts": "shared texts",
+  "config.forms": "form fields",
 };
 
 /** Saves one structured site setting after checking it on the server. */
 export async function saveConfig(key: string, value: unknown): Promise<{ ok?: boolean; error?: string }> {
   // Tracking codes run scripts on every page, so only admins may change them.
-  const user = await requireUser(key === "config.tracking" ? "settings.integrations" : "settings.site");
+  const user = await requireUser(key === "config.tracking" ? "settings.integrations" : key === "config.forms" ? "settings.forms" : "settings.site");
   if (!(key in CONFIG)) return { error: "Unknown setting." };
   const k = key as ConfigKey;
   const checked = validateConfig(k, value);
