@@ -185,6 +185,8 @@ export const TEXT_DEFAULTS = {
   "product.comingSoon": "This range is being photographed. Contact us for the full catalogue and samples.",
   "product.enquire": "Enquire Now",
   "product.similar": "Similar Products",
+  "product.viewAll": "View all products",
+  "product.allTitle": "All products",
 } as const;
 
 export type TextKey = keyof typeof TEXT_DEFAULTS;
