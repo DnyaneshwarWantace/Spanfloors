@@ -12,6 +12,7 @@ import { db, schema } from "@/db";
 import { CATEGORIES, displayName, formatOf, getCatalog, subtitleOf } from "@/lib/catalog";
 import { mediaUrl } from "@/server/storage";
 import { getConfig, getTexts } from "@/server/site-config";
+import { FORM_FIELDS, fieldModes } from "@/lib/form-fields";
 
 const out = resolve(process.argv[2] ?? "site-data.json");
 
@@ -81,7 +82,7 @@ async function main() {
 
   const redirects = await db.select({ from: schema.redirects.fromPath, to: schema.redirects.toPath }).from(schema.redirects);
   const content = rows.map(({ featuredPath, featuredAlt, ...r }) => ({ ...r, image: featuredPath ? { url: mediaUrl(featuredPath), alt: featuredAlt ?? "" } : null }));
-  const [header, footer, contact, studios, identity, texts, authors] = await Promise.all([
+  const [header, footer, contact, studios, identity, texts, authors, formsCfg] = await Promise.all([
     getConfig("config.header"),
     getConfig("config.footer"),
     getConfig("config.contact"),
@@ -89,6 +90,7 @@ async function main() {
     getConfig("config.identity"),
     getTexts(),
     db.select({ name: schema.authors.name, slug: schema.authors.slug, jobTitle: schema.authors.jobTitle, bio: schema.authors.bio }).from(schema.authors),
+    getConfig("config.forms"),
   ]);
   // Media ids in the identity settings → addresses.
   const idIds = [identity.logo, identity.logoLight, identity.favicon, identity.shareImage].filter((x): x is string => Boolean(x));
@@ -113,6 +115,8 @@ async function main() {
     identity: Object.fromEntries(idMedia.map((m) => [m.id, mediaUrl(m.path)])),
     texts,
     authors,
+    /** Admin → Forms: which extra fields each website form shows (optional / required / hidden). */
+    forms: Object.fromEntries(Object.keys(FORM_FIELDS).map((k) => [k, fieldModes(formsCfg, k)])),
   };
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(data, null, 1));
